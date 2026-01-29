@@ -1,0 +1,649 @@
+<script>
+const GSHEET_API = '/api/gsheet-proxy';
+</script>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> The Lucky Racer </title>
+    <link rel="stylesheet" href="style.css?v=45">
+</head>
+<body>
+    <!-- Login Modal -->
+    <div id="loginModal" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;">
+        <div style="background:#222;padding:32px 24px 24px 24px;border-radius:12px;box-shadow:0 4px 32px #0006;min-width:320px;max-width:90vw;">
+            <h2 style="color:#fff;text-align:center;margin-bottom:18px;">Đăng nhập để vào Lucky Racer</h2>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                <input id="loginUsername" type="text" placeholder="Nhập tên đăng nhập" style="padding:10px 12px;border-radius:6px;border:1px solid #888;font-size:16px;outline:none;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <input id="loginPassword" type="password" placeholder="Nhập mật khẩu" style="padding:10px 12px;border-radius:6px;border:1px solid #888;font-size:16px;outline:none;flex:1;">
+                    <label style="color:#fff;font-size:13px;cursor:pointer;user-select:none;">
+                        <input type="checkbox" id="showLoginPassword" style="margin-right:2px;"> Hiện
+                    </label>
+                </div>
+                <label style="color:#fff;font-size:15px;display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" id="isAdmin" style="width:16px;height:16px;"> Đăng nhập với quyền admin
+                </label>
+                <button id="loginBtn" style="padding:10px 0;border-radius:6px;background:#667eea;color:#fff;font-size:16px;border:none;cursor:pointer;position:relative;">Đăng nhập
+                    <span id="loginLoadingSpinner" style="display:none;position:absolute;right:16px;top:50%;transform:translateY(-50%);">
+                        <span class="loading-spinner" style="width:22px;height:22px;border-width:3px;margin:0;"></span>
+                    </span>
+                </button>
+                <div id="loginError" style="color:#ff7675;text-align:center;display:none;font-size:14px;">Vui lòng nhập tên đăng nhập!</div>
+            </div>
+        </div>
+    </div>
+    <!-- Remove tab navigation, keep single page -->
+    <div class="container" id="mainContent" style="display:none;">
+        <!-- Chức năng admin: generate mật khẩu -->
+        <div id="adminPanel" style="display:none;margin-bottom:24px;">
+            <h3 style="color:#FFD700;">🔑 Admin Panel</h3>
+            <button id="genPassBtn" style="padding:8px 18px;border-radius:6px;background:#e17055;color:#fff;font-size:16px;border:none;cursor:pointer;">Tạo mật khẩu ngẫu nhiên</button>
+            <div id="genPassResult" style="margin-top:10px;color:#00b894;font-size:18px;font-weight:bold;"></div>
+            <form id="addAccountForm" style="margin-top:18px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                <input id="newUsername" type="text" placeholder="Tên đăng nhập mới" style="padding:6px 10px;border-radius:5px;border:1px solid #888;min-width:120px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <input id="newPassword" type="password" placeholder="Mật khẩu mới" style="padding:6px 10px;border-radius:5px;border:1px solid #888;min-width:120px;">
+                    <label style="color:#fff;font-size:13px;cursor:pointer;user-select:none;">
+                        <input type="checkbox" id="showNewPassword" style="margin-right:2px;"> Hiện
+                    </label>
+                </div>
+                <input id="activeTime" type="datetime-local" style="padding:6px 10px;border-radius:5px;border:1px solid #888;">
+                <input id="revokeTime" type="datetime-local" style="padding:6px 10px;border-radius:5px;border:1px solid #888;">
+                <button type="submit" style="padding:6px 14px;border-radius:5px;background:#00b894;color:#fff;border:none;">Thêm tài khoản</button>
+            </form>
+            <div id="accountList" style="margin-top:16px;color:#fff;font-size:15px;"></div>
+        </div>
+            <h1> The Lucky Racer - Settings </h1>
+            
+            <!-- Loading Indicator -->
+            <div class="loading-container" id="loadingContainer">
+                <div class="loading-spinner"></div>
+                <div class="loading-text" id="loadingText">Loading icons...</div>
+                <div class="loading-progress" id="loadingProgress">0%</div>
+            </div>
+            
+            <!-- Game Settings -->
+            <div class="settings-panel" id="settingsPanel">
+            <h2>Race Settings</h2>
+            <div class="input-group">
+                <label for="duckCount">Number of Racers:</label>
+                <input type="number" id="duckCount" min="10" max="10000" value="3000">
+            </div>
+            <div class="input-group">
+                <label for="raceDuration">Race Duration (seconds):</label>
+                <input type="number" id="raceDuration" min="5" max="300" value="30">
+            </div>
+            <div class="input-group">
+                <label for="gameSpeed">Game Speed: <span id="gameSpeedValue">1.0x</span></label>
+                <input type="range" id="gameSpeed" min="0.25" max="3" step="0.25" value="1" 
+                       oninput="document.getElementById('gameSpeedValue').textContent = this.value + 'x'; if(window.game) game.updateGameSpeed(parseFloat(this.value));">
+                <small style="color: #888;">Adjust race speed: 0.25x (slow motion) to 3x (fast forward)</small>
+            </div>
+            <div class="input-group">
+                <label for="raceMode">Race Mode:</label>
+                <select id="raceMode" onchange="game.toggleRaceMode()">
+                    <option value="normal">Normal (Single Winner)</option>
+                    <option value="topN">Top N Winners</option>
+                </select>
+                <small style="color: #888;">Normal: Single winner with popup. Top N: Multiple winners with results panel.</small>
+            </div>
+            <div class="input-group hidden" id="winnerCountGroup">
+                <label for="winnerCount">Number of Winners:</label>
+                <input type="number" id="winnerCount" min="1" max="50" value="3">
+                <small style="color: #888;">How many winners to wait for (1-50)</small>
+            </div>
+            <div class="input-group">
+                <label for="duckNamesFile" id="fileLabel">Racer List File (CSV/Excel):</label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="file" id="duckNamesFile" accept=".csv,.xlsx" onchange="game.loadDuckNames(event)" style="flex: 1;">
+                    <button onclick="game.clearLoadedFile()" id="clearFileBtn" class="btn btn-warning" style="display: none; padding: 8px 16px;">🗑️ Clear</button>
+                </div>
+                <small style="color: #888;" id="fileHelp">Upload CSV/Excel to use custom names, or leave empty for random names</small>
+            </div>
+            <div class="input-group">
+                <label for="iconTheme">Icon Theme:</label>
+                <select id="iconTheme" onchange="game.changeIconTheme()">
+                    <option value="output_1">Theme 1</option>
+                    <option value="output_2">Theme 2</option>
+                </select>
+                <small style="color: #888;" id="iconCount">0 icon</small>
+            </div>
+            <div class="input-group">
+                <label for="soundToggle">
+                    <input type="checkbox" id="soundToggle" checked> Enable Sound
+                </label>
+            </div>
+            <div class="input-group">
+                <label for="customSoundFile">Custom Race Sound (MP3):</label>
+                <input type="file" id="customSoundFile" accept=".mp3,.wav,.ogg" style="width: 100%; padding: 5px;">
+                <small style="color: #888;">Optional: Upload custom racing ambiance sound</small>
+            </div>
+            
+            <div class="input-group" style="margin-top: 20px;">
+                <a href="display.html" target="_blank" class="btn btn-secondary" id="openDisplayBtn" style="width: 100%; margin-bottom: 10px; text-align: center; text-decoration: none; display: inline-block; pointer-events: none; opacity: 0.5;">
+                    ⏳ Loading Icons...
+                </a>
+                <small style="color: #FFD700; font-weight: bold;">📺 How to use:</small><br>
+                <small style="color: #888;">
+                    
+            </div>
+            <button class="btn btn-primary" id="startRaceBtn" onclick="game.startRace()" disabled>Loading...</button>
+        </div>
+
+        <!-- Leaderboard -->
+        <div class="history-win" id="historyWin">
+            <h3>🏆 Victory History</h3>
+            <div id="historyWinList"></div>
+            <button class="btn btn-small" onclick="game.resetHistory()" style="margin-top: 10px; width: 100%;">🔄 Restart (Clear History)</button>
+        </div>
+
+        <!-- Result Panel Settings - Collapsible -->
+        <div class="result-panel-settings" style="margin-top: 30px;">
+            <div style="margin-top: 30px; border-top: 2px solid rgba(255,255,255,0.2); padding-top: 20px;">
+                <button class="btn btn-small" onclick="game.toggleResultPanelSettings()" style="background: #667eea; width: 100%;">⚙️ Result Panel Settings</button>
+                
+                <div id="resultPanelSettingsContainer" class="hidden" style="margin-top: 15px; padding: 15px; background: rgba(102, 126, 234, 0.1); border-radius: 8px;">
+                    <div class="input-group">
+                        <label for="prizeTitleInput">Prize Title:</label>
+                        <input type="text" id="prizeTitleInput" placeholder="Prize Results" value="Prize Results" maxlength="50" style="padding: 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; width: 100%;">
+                        <small style="color: #888;">This will appear on result panel and popup</small>
+                    </div>
+                    
+                    <div style="margin-top: 15px; padding: 10px; background: rgba(240, 147, 251, 0.1); border-radius: 5px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="color: #f093fb; font-size: 16px; margin: 0;">🏆 Customize Prize Names</h4>
+                            <div style="display: flex; gap: 5px;">
+                                <button onclick="game.sortPrizeNames('asc')" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px;" title="Sort Prize 1, 2, 3...">↑ 1-N</button>
+                                <button onclick="game.sortPrizeNames('desc')" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px;" title="Sort Prize N, N-1... 3, 2, 1">↓ N-1</button>
+                                <button onclick="game.addPrizeNameField()" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px;">+ Add Prize</button>
+                            </div>
+                        </div>
+                        <div id="prizeNamesContainer" style="display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto;">
+                            <!-- Prize name fields will be dynamically added here -->
+                        </div>
+                        <small style="color: #888; margin-top: 8px; display: block;">Leave blank to use default names (Prize 1, Prize 2, etc.)</small>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="resultBgType">Background Type:</label>
+                        <select id="resultBgType" onchange="game.toggleResultBackground()">
+                            <option value="default">Default</option>
+                            <option value="color">Solid Color</option>
+                            <option value="image">Custom Image</option>
+                        </select>
+                    </div>
+                    
+                    <div class="input-group" id="resultBgColorGroup" style="display: none;">
+                        <label for="resultBgColor">Background Color:</label>
+                        <input type="color" id="resultBgColor" value="#1a1a2e">
+                    </div>
+                    
+                    <div class="input-group" id="resultBgImageGroup" style="display: none;">
+                        <label for="resultBgImage">Background Image:</label>
+                        <input type="file" id="resultBgImage" accept="image/*" onchange="game.loadResultBackgroundImage(event)">
+                        <small style="color: #888;">Upload JPG, PNG, or GIF</small>
+                    </div>
+                    
+                    <div style="margin-top: 15px; padding: 10px; background: rgba(102, 126, 234, 0.1); border-radius: 5px;">
+                        <h4 style="color: #667eea; font-size: 16px; margin: 0 0 10px 0;">📐 Layout Settings</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <label style="font-size: 14px; color: #fff;">Race Track Aspect Ratio:</label>
+                                <input type="text" id="raceTrackAspectRatio" value="20:5" placeholder="e.g., 16:9, 30:9, 21:9" 
+                                    style="padding: 8px; background: rgba(0,0,0,0.3); border: 1px solid #667eea; border-radius: 5px; color: #fff; font-size: 14px;"
+                                    oninput="validateAspectRatioInput(this)">
+                                <small style="color: #888; font-size: 12px;">Format: width:height (e.g., 16:9, 30:9)</small>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <label style="font-size: 14px; color: #fff;">Winners Grid Width:</label>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <input type="range" id="winnersGridWidth" min="70" max="100" value="95" style="flex: 1;">
+                                    <span id="winnersGridWidthValue" style="min-width: 40px; font-size: 14px; color: #667eea;">95%</span>
+                                </div>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <label style="font-size: 14px; color: #fff;">Card Gap:</label>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <input type="range" id="cardGap" min="0.5" max="3" step="0.5" value="1.5" style="flex: 1;">
+                                    <span id="cardGapValue" style="min-width: 40px; font-size: 14px; color: #667eea;">1.5%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <small style="color: #888; margin-top: 8px; display: block;">Adjust race track dimensions and winner card layout</small>
+                    </div>
+                    
+                    <div class="input-group">
+                        <button class="btn btn-small" onclick="game.applyResultPanelSettings()" style="background: #667eea; margin-right: 10px;">✓ Apply</button>
+                        <button class="btn btn-small" onclick="game.resetResultPanelSettings()" style="background: #888;">⟲ Reset</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Panel Preview - Independent -->
+        <div class="result-panel hidden" id="resultPanel" style="margin-top: 30px;">
+            <h2 id="resultTitle">Results</h2>
+            <div id="resultMessage"></div>
+        </div>
+
+        <script>
+            // Update slider values display
+            document.getElementById('winnersGridWidth').addEventListener('input', (e) => {
+                document.getElementById('winnersGridWidthValue').textContent = e.target.value + '%';
+            });
+            document.getElementById('cardGap').addEventListener('input', (e) => {
+                document.getElementById('cardGapValue').textContent = e.target.value + '%';
+            });
+            
+            // Validate aspect ratio input format
+            function validateAspectRatioInput(input) {
+                const value = input.value.trim();
+                // Allow digits, colon, and spaces
+                const cleaned = value.replace(/[^0-9:]/g, '');
+                if (cleaned !== value) {
+                    input.value = cleaned;
+                }
+                
+                // Check if format is valid (e.g., "16:9", "30:9")
+                const match = cleaned.match(/^(\d+):(\d+)$/);
+                if (match) {
+                    input.style.borderColor = '#667eea';
+                    input.style.background = 'rgba(0,0,0,0.3)';
+                } else if (cleaned.length > 0) {
+                    input.style.borderColor = '#ff6b6b';
+                    input.style.background = 'rgba(255,107,107,0.1)';
+                } else {
+                    input.style.borderColor = '#667eea';
+                    input.style.background = 'rgba(0,0,0,0.3)';
+                }
+            }
+        </script>
+
+        <!-- Race History -->
+        <div class="history-panel hidden" id="historyPanel">
+            <h2>📊 Race History</h2>
+            <div id="historyList"></div>
+            <button class="btn btn-primary" onclick="game.closeHistory()">Close</button>
+        </div>
+        
+        <!-- Race Info (for control window) -->
+        <div class="race-info hidden" id="raceInfo" style="margin-top: 20px; position: relative;">
+            <div class="info-item">
+                <span class="label">Race:</span>
+                <span id="raceNumber" class="value">#1</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Time Left:</span>
+                <span id="timeLeft" class="value">30s</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Status:</span>
+                <span id="raceStatus" class="value">Waiting</span>
+            </div>
+        </div>
+
+        <!-- Control Panel (for control window) -->
+        <div class="control-panel hidden" id="controlPanel" style="margin-top: 20px; position: relative; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+            <button class="btn btn-small" onclick="game.goHome()" id="homeBtn">🏠 Home</button>
+            <button class="btn btn-small" onclick="game.controlStartRace()" id="controlStartBtn" disabled>Loading...</button>
+            <button class="btn btn-small" onclick="game.pauseRace()" id="pauseBtn">⏸ Pause</button>
+            <button class="btn btn-small" onclick="game.resumeRace()" id="resumeBtn" disabled>▶ Resume</button>
+            <button class="btn btn-primary" onclick="game.continueRace()" id="continueBtn" style="display: none;">🎯 Next Race</button>
+            <button class="btn btn-secondary" onclick="game.showWinnersPanel()" id="viewResultsBtn">📋 View Results</button>
+        </div>
+
+        <!-- Race Track HIDDEN on control screen - only visible on display.html -->
+        <div class="race-track hidden" id="raceTrack" style="display: none !important;">
+            <div class="bank-top" id="bankTop">
+                <div class="big-timer hidden" id="bigTimer">
+                    <div class="timer-display">00:00:00</div>
+                </div>
+            </div>
+            <div class="race-river" id="raceRiver">
+                <div class="water-flow"></div>
+                <div class="water-ripples"></div>
+                <div class="fish-layer" id="fishLayer">
+                    <div class="fish fish-1">🐟</div>
+                    <div class="fish fish-2">🐠</div>
+                    <div class="fish fish-3">🐡</div>
+                    <div class="fish fish-4">🐟</div>
+                    <div class="fish fish-5">🐠</div>
+                </div>
+                <!-- Ducks will be added here dynamically -->
+            </div>
+            <div class="bank-bot" id="bankBot">
+                <button class="btn btn-primary hidden" onclick="game.continueRace()" id="continueBankBtn" style="position: absolute; left: 50%; transform: translateX(-50%); bottom: 20px; z-index: 1000;">🎯 Continue Next Race</button>
+            </div>
+            <div class="finish-line hidden" id="finishLine">FINISH</div>
+        </div>
+    </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10000; display: flex; flex-direction: column; gap: 10px; pointer-events: none;"></div>
+
+    <!-- Victory Popup (outside container for max z-index) -->
+    <div class="victory-popup hidden" id="victoryPopup">
+        <div class="victory-overlay" onclick="game.closeVictoryPopup()"></div>
+        <div class="victory-content">
+            <div class="victory-header">
+                <h1>🎉 VICTORY! 🎉</h1>
+            </div>
+            <div class="victory-body">
+                <div class="winner-icon" id="winnerIcon"></div>
+                <h2 class="winner-name" id="winnerName">Winner Name</h2>
+                <div class="winner-stats" id="winnerStats"></div>
+            </div>
+            <div class="victory-footer" style="display: none;">
+                <button class="btn btn-primary" onclick="game.continueRace()">🎯 Continue (Next Race)</button>
+                <button class="btn btn-secondary" onclick="game.closeVictoryPopup(); game.showWinnersPanel()">📋 View Results</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top N Victory Popup -->
+    <div class="victory-popup hidden" id="topNVictoryPopup">
+        <div class="victory-overlay" onclick="game.closeTopNVictoryPopup()"></div>
+        <div class="victory-content victory-content-topn">
+            <div class="victory-header">
+                <h1>🏆 TOP <span id="topNCount">N</span> WINNERS! 🏆</h1>
+            </div>
+            <div class="victory-body victory-body-topn" id="topNWinnersGrid">
+                <!-- Winners will be populated here -->
+            </div>
+            <div class="victory-footer">
+                <button class="btn btn-primary" onclick="game.closeTopNVictoryPopup(); game.resetRace()">▶️ Next Race</button>
+                <button class="btn btn-secondary" onclick="game.closeTopNVictoryPopup(); game.fullReset()">🔄 Play Again</button>
+                <button class="btn btn-secondary" onclick="game.closeTopNVictoryPopup(); game.showTopNResultPanel()">📋 View Full Results</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SheetJS library for Excel file support -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    
+    <script src="game.js?v=60"></script>
+    <script>
+    // Đăng nhập đơn giản: chỉ cần nhập username, lưu vào localStorage
+    function showLogin() {
+        document.getElementById('loginModal').style.display = 'flex';
+        document.getElementById('mainContent').style.display = 'none';
+    }
+    function showMain() {
+        document.getElementById('loginModal').style.display = 'none';
+        document.getElementById('mainContent').style.display = '';
+        // Nếu là admin thì hiển thị adminPanel
+        if (localStorage.getItem('lucky_racer_is_admin') === '1') {
+            document.getElementById('adminPanel').style.display = '';
+        } else {
+            document.getElementById('adminPanel').style.display = 'none';
+        }
+    }
+    function isLoggedIn() {
+        return !!localStorage.getItem('lucky_racer_user');
+    }
+    async function handleLogin() {
+        var loginBtn = document.getElementById('loginBtn');
+        var spinner = document.getElementById('loginLoadingSpinner');
+        loginBtn.disabled = true;
+        loginBtn.style.opacity = 0.7;
+        spinner.style.display = 'inline-block';
+        var username = document.getElementById('loginUsername').value.trim();
+        var password = document.getElementById('loginPassword').value;
+        var isAdmin = document.getElementById('isAdmin').checked;
+        var errorDiv = document.getElementById('loginError');
+        errorDiv.style.display = 'none';
+        if (!username || !password) {
+            errorDiv.textContent = 'Vui lòng nhập tên đăng nhập và mật khẩu!';
+            errorDiv.style.display = 'block';
+            loginBtn.disabled = false;
+            loginBtn.style.opacity = 1;
+            spinner.style.display = 'none';
+            return;
+        }
+        // Lấy danh sách account từ API
+        const GSHEET_API = '/api/gsheet-proxy';
+        let accounts = [];
+        try {
+            let res = await fetch(GSHEET_API);
+            accounts = await res.json();
+        } catch (e) {
+            errorDiv.textContent = 'Không thể kết nối server!';
+            errorDiv.style.display = 'block';
+            loginBtn.disabled = false;
+            loginBtn.style.opacity = 1;
+            spinner.style.display = 'none';
+            return;
+        }
+        var now = Date.now();
+        // Nếu là admin: chỉ cho phép đăng nhập đúng account visionx/admin123
+        if (isAdmin) {
+            let found = accounts.find(acc => acc.username === 'visionx' && acc.password === 'admin123');
+            if (!found) {
+                errorDiv.textContent = 'Không tìm thấy tài khoản admin!';
+                errorDiv.style.display = 'block';
+                loginBtn.disabled = false;
+                loginBtn.style.opacity = 1;
+                spinner.style.display = 'none';
+                return;
+            }
+            if (username !== 'visionx' || password !== 'admin123') {
+                errorDiv.textContent = 'Sai tài khoản hoặc mật khẩu admin!';
+                errorDiv.style.display = 'block';
+                loginBtn.disabled = false;
+                loginBtn.style.opacity = 1;
+                spinner.style.display = 'none';
+                return;
+            }
+            localStorage.setItem('lucky_racer_user', username);
+            localStorage.setItem('lucky_racer_is_admin', '1');
+            loginBtn.disabled = false;
+            loginBtn.style.opacity = 1;
+            spinner.style.display = 'none';
+            showMain();
+            return;
+        }
+        // Đăng nhập thường: kiểm tra account hợp lệ, trong thời gian hiệu lực
+        let found = accounts.find(acc => acc.username === username && acc.password === password && now >= acc.active && now <= acc.revoke);
+        if (!found) {
+            errorDiv.textContent = 'Sai tài khoản, mật khẩu hoặc tài khoản đã hết hạn!';
+            errorDiv.style.display = 'block';
+            loginBtn.disabled = false;
+            loginBtn.style.opacity = 1;
+            spinner.style.display = 'none';
+            return;
+        }
+        localStorage.setItem('lucky_racer_user', username);
+        localStorage.removeItem('lucky_racer_is_admin');
+        loginBtn.disabled = false;
+        loginBtn.style.opacity = 1;
+        spinner.style.display = 'none';
+        showMain();
+        // Khởi tạo game nếu cần
+        if (typeof game !== 'undefined') {
+            game.loadSavedData && game.loadSavedData();
+            game.loadPrizeNames && game.loadPrizeNames();
+            game.loadResultPanelSettings && game.loadResultPanelSettings();
+        }
+    }
+        // Hàm sinh mật khẩu ngẫu nhiên
+        function generatePassword(length = 10) {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*';
+            let pass = '';
+            for (let i = 0; i < length; i++) {
+                pass += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return pass;
+        }
+
+        // Hợp nhất sự kiện DOMContentLoaded để kiểm soát hiển thị giao diện và gán sự kiện
+        window.addEventListener('DOMContentLoaded', function() {
+                        // Sự kiện show/hide password cho login
+                        const showLoginPw = document.getElementById('showLoginPassword');
+                        if (showLoginPw) {
+                            showLoginPw.addEventListener('change', function() {
+                                const pwInput = document.getElementById('loginPassword');
+                                if (pwInput) pwInput.type = this.checked ? 'text' : 'password';
+                            });
+                        }
+                        // Sự kiện show/hide password cho admin panel
+                        const showNewPw = document.getElementById('showNewPassword');
+                        if (showNewPw) {
+                            showNewPw.addEventListener('change', function() {
+                                const pwInput = document.getElementById('newPassword');
+                                if (pwInput) pwInput.type = this.checked ? 'text' : 'password';
+                            });
+                        }
+            // Ẩn cả hai giao diện trước khi kiểm tra
+            document.getElementById('loginModal').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'none';
+
+            // Luôn yêu cầu đăng nhập mỗi lần truy cập
+            localStorage.removeItem('lucky_racer_user');
+            localStorage.removeItem('lucky_racer_is_admin');
+            showLogin();
+            document.getElementById('loginBtn').onclick = handleLogin;
+            document.getElementById('loginUsername').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') handleLogin();
+            });
+            // Sự kiện cho nút generate mật khẩu (chỉ khi là admin)
+            const genBtn = document.getElementById('genPassBtn');
+            if (genBtn) {
+                genBtn.onclick = function() {
+                    const pw = generatePassword(12);
+                    document.getElementById('genPassResult').textContent = pw;
+                };
+            }
+
+            // Admin panel: quản lý tài khoản
+            async function renderAccountList() {
+                let html = '<b>Danh sách tài khoản:</b><br>';
+                let accounts = [];
+                try {
+                    let res = await fetch(GSHEET_API);
+                    accounts = await res.json();
+                } catch (e) {
+                    html += '<span style="color:#ff7675">Không thể tải danh sách tài khoản!</span>';
+                    document.getElementById('accountList').innerHTML = html;
+                    return;
+                }
+                if (accounts.length === 0) {
+                    html += '<i>Chưa có tài khoản nào.</i>';
+                } else {
+                    html += '<ul style="padding-left:18px;">';
+                    accounts.forEach(function(item, idx) {
+                        var activeStr = new Date(item.active).toLocaleString();
+                        var revokeStr = new Date(item.revoke).toLocaleString();
+                        var expired = Date.now() > item.revoke;
+                        html += `<li><span style="color:${expired ? '#ff7675':'#00b894'}">${item.username}</span> <span style="font-size:13px;">(Hiệu lực: ${activeStr} - ${revokeStr})</span> <button onclick=\"removeAccount('${item.username}')\" style=\"color:#fff;background:#e17055;border:none;border-radius:4px;padding:2px 8px;margin-left:8px;cursor:pointer;\">Xóa</button></li>`;
+                    });
+                    html += '</ul>';
+                }
+                document.getElementById('accountList').innerHTML = html;
+            }
+            window.removeAccount = async function(username) {
+                const params = new URLSearchParams();
+                params.append('action', 'delete');
+                params.append('username', username);
+                await fetch(GSHEET_API, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params.toString()
+                });
+                renderAccountList();
+            };
+            // Module gửi dữ liệu tạo tài khoản lên Google Script
+            async function createAccountOnGSheet({username, password, activeMs, revokeMs}) {
+                // Gửi trực tiếp lên Google Script Web App (bỏ qua proxy nếu cần)
+                const GSHEET_WEBAPP = 'https://script.google.com/macros/s/AKfycbxo289V3Ky97PwhyW5INpfefEaw_LRwb90mbmBVtUNYIIxMphJ8plKTD8P7RnUmRsRm/exec';
+                const params = new URLSearchParams();
+                params.append('username', username);
+                params.append('password', password);
+                params.append('active', activeMs);
+                params.append('revoke', revokeMs);
+                try {
+                    let res = await fetch(GSHEET_WEBAPP, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: params.toString()
+                    });
+                    let data = await res.json();
+                    return data;
+                } catch (e) {
+                    return { error: 'Lỗi kết nối server!' };
+                }
+            }
+
+            var addForm = document.getElementById('addAccountForm');
+            if (addForm) {
+                addForm.onsubmit = async function(e) {
+                    e.preventDefault();
+                    var username = document.getElementById('newUsername').value.trim();
+                    var pw = document.getElementById('newPassword').value.trim();
+                    // Bắt buộc mật khẩu phải bắt đầu bằng chữ cái (không được bắt đầu bằng số)
+                    if (!/^[A-Za-z]/.test(pw)) {
+                        alert('Mật khẩu phải bắt đầu bằng ký tự chữ cái (không được bắt đầu bằng số)!');
+                        return;
+                    }
+                                // Sự kiện show/hide password cho login
+                                const showLoginPw = document.getElementById('showLoginPassword');
+                                if (showLoginPw) {
+                                    showLoginPw.addEventListener('change', function() {
+                                        const pwInput = document.getElementById('loginPassword');
+                                        pwInput.type = this.checked ? 'text' : 'password';
+                                    });
+                                }
+                                // Sự kiện show/hide password cho admin panel
+                                const showNewPw = document.getElementById('showNewPassword');
+                                if (showNewPw) {
+                                    showNewPw.addEventListener('change', function() {
+                                        const pwInput = document.getElementById('newPassword');
+                                        pwInput.type = this.checked ? 'text' : 'password';
+                                    });
+                                }
+                    var active = document.getElementById('activeTime').value;
+                    var revoke = document.getElementById('revokeTime').value;
+                    if (!username || !pw || !active || !revoke) {
+                        alert('Vui lòng nhập đủ tài khoản, mật khẩu, thời gian hiệu lực và thu hồi!');
+                        return;
+                    }
+                    var activeMs = new Date(active).getTime();
+                    var revokeMs = new Date(revoke).getTime();
+                    console.log('DEBUG gửi lên:', { username, password: pw, active, revoke, activeMs, revokeMs });
+                    if (!active || !revoke || isNaN(activeMs) || isNaN(revokeMs) || activeMs >= revokeMs) {
+                        alert('Thời gian không hợp lệ!');
+                        return;
+                    }
+                    // Gọi module gửi dữ liệu
+                    let data = await createAccountOnGSheet({username, password: pw, activeMs, revokeMs});
+                    if (data.success) {
+                        alert('Thêm tài khoản thành công!');
+                    } else {
+                        alert('Lỗi: ' + (data.error || 'Không rõ nguyên nhân'));
+                    }
+                    document.getElementById('newUsername').value = '';
+                    document.getElementById('newPassword').value = '';
+                    document.getElementById('activeTime').value = '';
+                    document.getElementById('revokeTime').value = '';
+                    renderAccountList();
+                };
+            }
+            // Hiển thị danh sách tài khoản khi vào admin panel
+            if (localStorage.getItem('lucky_racer_is_admin') === '1') {
+                renderAccountList();
+            }
+            // Khi chuyển sang admin, tự động render lại danh sách
+            window.showMain = (function(orig) {
+                return function() {
+                    orig();
+                    if (localStorage.getItem('lucky_racer_is_admin') === '1') {
+                        renderAccountList();
+                    }
+                }
+            })(window.showMain);
+        });
+    </script>
+</body>
+</html>

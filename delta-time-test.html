@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delta Time Test - Racing Duck</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+        }
+        .test-panel {
+            background: #2a2a2a;
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .stat-item {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #00ff00;
+        }
+        .stat-label {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00ff00;
+        }
+        .warning {
+            color: #ffaa00;
+        }
+        .error {
+            color: #ff0000;
+        }
+        .success {
+            color: #00ff00;
+        }
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #00cc00;
+        }
+        .console {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .console-line {
+            margin: 2px 0;
+            padding: 2px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🦆 Delta Time Test Monitor 🦆</h1>
+        
+        <div class="test-panel">
+            <h2>📊 Real-time Performance Metrics</h2>
+            <div class="stat-grid">
+                <div class="stat-item">
+                    <div class="stat-label">Current FPS</div>
+                    <div class="stat-value" id="currentFPS">--</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Average FPS</div>
+                    <div class="stat-value" id="avgFPS">--</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Frame Time (ms)</div>
+                    <div class="stat-value" id="frameTime">--</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Delta Time Multiplier</div>
+                    <div class="stat-value" id="deltaTime">--</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Target FPS</div>
+                    <div class="stat-value">60</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Target Frame Time</div>
+                    <div class="stat-value">16.67 ms</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-panel">
+            <h2>🧪 Delta Time Validation</h2>
+            <div class="stat-grid">
+                <div class="stat-item">
+                    <div class="stat-label">Status</div>
+                    <div class="stat-value" id="validationStatus">Waiting...</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Expected Movement (60fps)</div>
+                    <div class="stat-value" id="expectedMovement">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Actual Movement</div>
+                    <div class="stat-value" id="actualMovement">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Difference (%)</div>
+                    <div class="stat-value" id="movementDiff">0%</div>
+                </div>
+            </div>
+            <button onclick="startTest()">▶️ Start Test</button>
+            <button onclick="stopTest()">⏸️ Stop Test</button>
+            <button onclick="clearConsole()">🗑️ Clear Console</button>
+        </div>
+
+        <div class="test-panel">
+            <h2>📝 Console Output</h2>
+            <div class="console" id="console"></div>
+        </div>
+    </div>
+
+    <script>
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let totalFPS = 0;
+        let fpsReadings = [];
+        let testRunning = false;
+        let testStartTime = 0;
+        let testPosition = 0;
+        const baseSpeed = 4.0; // Average duck speed at 60fps
+        const targetFPS = 60;
+        const targetFrameTime = 1000 / targetFPS;
+
+        function log(message, type = 'info') {
+            const console = document.getElementById('console');
+            const line = document.createElement('div');
+            line.className = 'console-line';
+            const timestamp = new Date().toLocaleTimeString('vi-VN', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit',
+                fractionalSecondDigits: 3
+            });
+            
+            let color = '#0f0';
+            if (type === 'warning') color = '#fa0';
+            if (type === 'error') color = '#f00';
+            if (type === 'success') color = '#0ff';
+            
+            line.innerHTML = `<span style="color: #888">[${timestamp}]</span> <span style="color: ${color}">${message}</span>`;
+            console.appendChild(line);
+            console.scrollTop = console.scrollHeight;
+        }
+
+        function updateMetrics() {
+            const now = performance.now();
+            const delta = now - lastTime;
+            lastTime = now;
+
+            // Calculate FPS
+            const currentFPS = 1000 / delta;
+            fpsReadings.push(currentFPS);
+            if (fpsReadings.length > 60) fpsReadings.shift();
+            const avgFPS = fpsReadings.reduce((a, b) => a + b, 0) / fpsReadings.length;
+
+            // Calculate delta time
+            const deltaTime = delta / targetFrameTime;
+
+            // Update UI
+            document.getElementById('currentFPS').textContent = currentFPS.toFixed(2);
+            document.getElementById('avgFPS').textContent = avgFPS.toFixed(2);
+            document.getElementById('frameTime').textContent = delta.toFixed(2);
+            document.getElementById('deltaTime').textContent = deltaTime.toFixed(3);
+
+            // Color code FPS
+            const fpsEl = document.getElementById('currentFPS');
+            if (currentFPS >= 55 && currentFPS <= 65) {
+                fpsEl.className = 'stat-value success';
+            } else if (currentFPS >= 45 && currentFPS <= 75) {
+                fpsEl.className = 'stat-value warning';
+            } else {
+                fpsEl.className = 'stat-value error';
+            }
+
+            // Test movement
+            if (testRunning) {
+                const elapsed = (now - testStartTime) / 1000;
+                
+                // Expected movement at constant 60fps
+                const expectedMovement = baseSpeed * 60 * elapsed;
+                
+                // Actual movement with delta time
+                testPosition += baseSpeed * deltaTime;
+                
+                // Calculate difference
+                const diff = ((testPosition - expectedMovement) / expectedMovement * 100);
+                
+                document.getElementById('expectedMovement').textContent = expectedMovement.toFixed(2) + ' px';
+                document.getElementById('actualMovement').textContent = testPosition.toFixed(2) + ' px';
+                document.getElementById('movementDiff').textContent = Math.abs(diff).toFixed(2) + '%';
+
+                const diffEl = document.getElementById('movementDiff');
+                if (Math.abs(diff) <= 2) {
+                    diffEl.className = 'stat-value success';
+                    document.getElementById('validationStatus').textContent = '✅ PASS';
+                    document.getElementById('validationStatus').className = 'stat-value success';
+                } else if (Math.abs(diff) <= 5) {
+                    diffEl.className = 'stat-value warning';
+                    document.getElementById('validationStatus').textContent = '⚠️ ACCEPTABLE';
+                    document.getElementById('validationStatus').className = 'stat-value warning';
+                } else {
+                    diffEl.className = 'stat-value error';
+                    document.getElementById('validationStatus').textContent = '❌ FAIL';
+                    document.getElementById('validationStatus').className = 'stat-value error';
+                }
+
+                // Log every second
+                if (Math.floor(elapsed) > Math.floor((now - testStartTime - delta) / 1000)) {
+                    log(`[${elapsed.toFixed(1)}s] FPS: ${avgFPS.toFixed(1)} | Delta: ${deltaTime.toFixed(3)} | Movement diff: ${Math.abs(diff).toFixed(2)}%`, 
+                        Math.abs(diff) <= 2 ? 'success' : Math.abs(diff) <= 5 ? 'warning' : 'error');
+                }
+            }
+
+            requestAnimationFrame(updateMetrics);
+        }
+
+        function startTest() {
+            if (!testRunning) {
+                testRunning = true;
+                testStartTime = performance.now();
+                testPosition = 0;
+                log('🚀 Test started - Monitoring delta time normalization...', 'success');
+                log(`📊 Baseline: 60 FPS, ${baseSpeed} px/frame = ${baseSpeed * 60} px/sec`, 'info');
+            }
+        }
+
+        function stopTest() {
+            if (testRunning) {
+                testRunning = false;
+                const elapsed = (performance.now() - testStartTime) / 1000;
+                const avgFPS = fpsReadings.reduce((a, b) => a + b, 0) / fpsReadings.length;
+                log('⏸️ Test stopped', 'warning');
+                log(`📈 Test duration: ${elapsed.toFixed(2)}s | Avg FPS: ${avgFPS.toFixed(2)}`, 'info');
+            }
+        }
+
+        function clearConsole() {
+            document.getElementById('console').innerHTML = '';
+            log('Console cleared', 'info');
+        }
+
+        // Start monitoring
+        log('🦆 Delta Time Monitor initialized', 'success');
+        log('System ready. Click "Start Test" to begin validation.', 'info');
+        requestAnimationFrame(updateMetrics);
+    </script>
+</body>
+</html>

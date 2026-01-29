@@ -1,0 +1,851 @@
+// Sound system
+class SoundManager {
+    constructor() {
+        this.enabled = true;
+        this.context = null;
+        this.initialized = false;
+    }
+
+    init() {
+        if (this.initialized) return;
+        try {
+            this.context = new (window.AudioContext || window.webkitAudioContext)();
+            this.initialized = true;
+        } catch (e) {
+            console.log('Audio not supported');
+        }
+    }
+
+    playStartSound() {
+        if (!this.enabled || !this.initialized) return;
+        this.playBeep(800, 0.1, 0.2);
+        setTimeout(() => this.playBeep(1000, 0.1, 0.2), 200);
+        setTimeout(() => this.playBeep(1200, 0.2, 0.3), 400);
+    }
+
+    playCrowdCheer() {
+        if (!this.enabled || !this.initialized) return;
+        for (let i = 0; i < 5; i++) {
+            setTimeout(() => {
+                this.playBeep(300 + Math.random() * 400, 0.05, 0.1);
+            }, i * 100);
+        }
+    }
+
+    playFinishSound() {
+        if (!this.enabled || !this.initialized) return;
+        this.playBeep(1500, 0.1, 0.3);
+        setTimeout(() => this.playBeep(1800, 0.2, 0.4), 150);
+    }
+
+    playBeep(frequency, volume, duration) {
+        if (!this.context) return;
+        const oscillator = this.context.createOscillator();
+        const gainNode = this.context.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(this.context.destination);
+        
+        oscillator.frequency.value = frequency;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(volume, this.context.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, this.context.currentTime + duration);
+        
+        oscillator.start(this.context.currentTime);
+        oscillator.stop(this.context.currentTime + duration);
+    }
+
+    setEnabled(enabled) {
+        this.enabled = enabled;
+    }
+}
+
+// Duck class with color and advanced animation
+class Duck {
+    constructor(id, trackLength, name = null) {
+        this.id = id;
+        this.name = name || `Vịt #${id}`;
+        this.position = 0;
+        this.speed = 0;
+        // Duck must run faster than camera (3 pixels/frame) to move forward
+        // Base: 3.2 - 4.0 pixels/frame (6-33% faster than camera)
+        this.baseSpeed = Math.random() * 0.8 + 3.2;
+        this.acceleration = 0;
+        this.maxSpeed = this.baseSpeed * 1.5;
+        this.minSpeed = this.baseSpeed * 0.5;
+        this.trackLength = trackLength;
+        this.finished = false;
+        this.finishTime = null;
+        this.color = this.generateColor();
+        this.wobbleOffset = Math.random() * Math.PI * 2;
+        this.previousPosition = 0;
+        this.previousRank = 0;
+        this.speedChangeTimer = 0;
+        this.targetSpeed = this.baseSpeed;
+        this.particles = [];
+        this.turboActive = false;
+        this.turboTimer = 0;
+        this.wingFlapSpeed = 1;
+    }
+
+    generateColor() {
+        const colors = [
+            '#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A',
+            '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739',
+            '#52B788', '#E63946', '#457B9D', '#E76F51', '#2A9D8F',
+            '#FF1493', '#00CED1', '#FF4500', '#32CD32', '#BA55D3'
+        ];
+        return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    randomizeSpeed() {
+        this.speed = this.baseSpeed;
+        this.targetSpeed = this.baseSpeed;
+    }
+
+    update(time) {
+        this.previousPosition = this.position;
+        if (!this.finished) {
+            // Random speed changes (acceleration / deceleration)
+            this.speedChangeTimer--;
+            if (this.speedChangeTimer <= 0) {
+                this.speedChangeTimer = Math.random() * 60 + 30;
+                const rand = Math.random();
+                
+                if (rand > 0.85) {
+                    // Turbo boost!
+                    this.targetSpeed = this.maxSpeed;
+                    this.turboActive = true;
+                    this.turboTimer = 30;
+                    this.wingFlapSpeed = 3;
+                } else if (rand > 0.7) {
+                    // Accelerate
+                    this.targetSpeed = this.baseSpeed * (1.5 + Math.random() * 0.5);
+                    this.wingFlapSpeed = 2;
+                } else if (rand < 0.15) {
+                    // Decelerate (tired)
+                    this.targetSpeed = this.minSpeed;
+                    this.wingFlapSpeed = 0.5;
+                } else {
+                    // Normal speed
+                    this.targetSpeed = this.baseSpeed * (0.8 + Math.random() * 0.4);
+                    this.wingFlapSpeed = 1;
+                }
+            }
+            
+            // Turbo effect
+            if (this.turboActive) {
+                this.turboTimer--;
+                if (this.turboTimer <= 0) {
+                    this.turboActive = false;
+                }
+                // Create particles
+                if (Math.random() > 0.7) {
+                    this.particles.push({
+                        x: this.position,
+                        y: 0,
+                        vx: -2 - Math.random() * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        life: 20,
+                        maxLife: 20
+                    });
+                }
+            }
+            
+            // Smooth acceleration/deceleration
+            this.acceleration = (this.targetSpeed - this.speed) * 0.08;
+            this.speed += this.acceleration;
+            this.speed = Math.max(this.minSpeed, Math.min(this.maxSpeed, this.speed));
+            
+            // Update position
+            this.position += this.speed + (Math.random() - 0.5) * 0.3;
+            
+            // Update particles
+            this.particles = this.particles.filter(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                return p.life > 0;
+            });
+            
+            if (this.position >= this.trackLength) {
+                this.position = this.trackLength;
+                this.finished = true;
+                this.finishTime = Date.now();
+            }
+        }
+    }
+
+    getWobble(time) {
+        return Math.sin(time * 0.015 + this.wobbleOffset) * 4;
+    }
+    
+    getSpeedIndicator() {
+        const speedPercent = (this.speed / this.maxSpeed);
+        if (this.turboActive) return '🔥';
+        if (speedPercent > 0.8) return '⚡';
+        if (speedPercent < 0.4) return '💤';
+        return '';
+    }
+}
+
+console.log('Classes loaded successfully');
+
+// Game class with all features
+class Game {
+    constructor() {
+        this.ducks = [];
+        this.duckCount = 300;
+        this.raceDuration = 30;
+        
+        // HYBRID APPROACH - NO MORE CANVAS
+        this.trackContainer = null;
+        this.duckElements = new Map(); // Store DOM elements for each duck
+        this.minimapContainer = null;
+        
+        this.trackLength = 0;
+        this.raceStarted = false;
+        this.raceFinished = false;
+        this.racePaused = false;
+        this.animationId = null;
+        this.startTime = null;
+        this.pausedTime = 0;
+        this.rankings = [];
+        this.soundManager = new SoundManager();
+        
+        // Camera/Viewport system
+        this.cameraOffset = 0;
+        this.viewportWidth = 0;
+        this.isFullscreen = false;
+        
+        // Statistics
+        this.stats = this.loadStats();
+        this.currentRaceNumber = this.stats.totalRaces + 1;
+        this.highlights = [];
+        this.raceHistory = [];
+        
+        // Duck names from file
+        this.duckNames = [];
+        
+        // Replay
+        this.replayMode = false;
+        this.replayData = [];
+        this.replayFrame = 0;
+        
+        // Duck images
+        this.duckImages = [];
+        this.iconCount = 30;
+        this.imagesLoaded = false;
+        
+        this.updateStatsDisplay();
+        this.preloadDuckImages();
+    }
+
+    loadStats() {
+        const saved = localStorage.getItem('duckRaceStats');
+        if (saved) {
+            return JSON.parse(saved);
+        }
+        return {
+            totalRaces: 0,
+            top3Finishes: 0,
+            wins: 0
+        };
+    }
+
+    saveStats() {
+        localStorage.setItem('duckRaceStats', JSON.stringify(this.stats));
+    }
+
+    updateStatsDisplay() {
+        document.getElementById('totalRaces').textContent = this.stats.totalRaces;
+        document.getElementById('top3Count').textContent = this.stats.top3Finishes;
+        const winRate = this.stats.totalRaces > 0 
+            ? ((this.stats.top3Finishes / this.stats.totalRaces) * 100).toFixed(1)
+            : 0;
+        document.getElementById('winRate').textContent = winRate + '%';
+    }
+
+    preloadDuckImages() {
+        let loadedCount = 0;
+        const totalImages = this.iconCount;
+        
+        for (let i = 1; i <= totalImages; i++) {
+            const img = new Image();
+            const paddedNum = String(i).padStart(2, '0');
+            img.src = `output/Input_Icon_${paddedNum}.png`;
+            
+            img.onload = () => {
+                loadedCount++;
+                if (loadedCount === totalImages) {
+                    this.imagesLoaded = true;
+                    console.log('All duck icons loaded!');
+                }
+            };
+            
+            img.onerror = () => {
+                console.warn(`Failed to load: ${img.src}`);
+                loadedCount++;
+                if (loadedCount === totalImages) {
+                    this.imagesLoaded = true;
+                }
+            };
+            
+            this.duckImages.push(img);
+        }
+    }
+
+    loadDuckNames(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const text = e.target.result;
+            const lines = text.split('\n');
+            
+            this.duckNames = [];
+            
+            // Skip header row
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                
+                const columns = line.split(',');
+                if (columns.length >= 2) {
+                    const stt = columns[0].trim();
+                    const name = columns[1].trim();
+                    if (stt && name) {
+                        this.duckNames.push(name);
+                    }
+                }
+            }
+            
+            if (this.duckNames.length > 0) {
+                // Auto set duck count = number of lines in file
+                document.getElementById('duckCount').value = this.duckNames.length;
+                alert(`Đã tải ${this.duckNames.length} tên từ file!`);
+            } else {
+                alert('Không đọc được tên từ file. Kiểm tra format: STT,Họ và Tên');
+            }
+        };
+        
+        reader.readAsText(file);
+    }
+
+    startRace() {
+        this.duckCount = parseInt(document.getElementById('duckCount').value);
+        this.raceDuration = 30; // Fixed 30 seconds
+        this.soundManager.setEnabled(document.getElementById('soundToggle').checked);
+
+        if (this.duckCount < 10 || this.duckCount > 1000) {
+            alert('Số lượng vịt phải từ 10 đến 1000!');
+            return;
+        }
+
+        // HYBRID APPROACH - Setup DOM-based track
+        this.trackContainer = document.getElementById('trackWater');
+        this.minimapContainer = document.getElementById('minimapDucks');
+        this.viewportWidth = 1200; // Fixed viewport width
+        
+        // Calculate track length based on race duration
+        const fps = 60;
+        const maxDuckSpeed = 4.0;
+        this.trackLength = maxDuckSpeed * fps * this.raceDuration;
+        this.cameraOffset = 0;
+
+        // Clear any existing ducks
+        this.trackContainer.innerHTML = '';
+        this.duckElements.clear();
+
+        // Create ducks (logic only)
+        this.ducks = [];
+        this.highlights = [];
+        this.replayData = [];
+        
+        for (let i = 1; i <= this.duckCount; i++) {
+            const duckName = this.duckNames.length >= i ? this.duckNames[i - 1] : null;
+            const duck = new Duck(i, this.trackLength, duckName);
+            duck.randomizeSpeed();
+            this.ducks.push(duck);
+            
+            // Create DOM element for this duck
+            this.createDuckElement(duck, i);
+        }
+
+        // UI updates
+        document.getElementById('settingsPanel').classList.add('hidden');
+        document.getElementById('raceInfo').classList.remove('hidden');
+        document.getElementById('controlPanel').classList.remove('hidden');
+        document.getElementById('raceTrack').classList.remove('hidden');
+        document.getElementById('minimap').classList.remove('hidden');
+        document.getElementById('leaderboard').classList.remove('hidden');
+        document.getElementById('highlightsPanel').classList.remove('hidden');
+        document.getElementById('bigTimer').classList.remove('hidden');
+
+        this.raceStarted = true;
+        this.raceFinished = false;
+        this.racePaused = false;
+        this.replayMode = false;
+        this.startTime = Date.now();
+        this.currentRaceNumber = this.stats.totalRaces + 1;
+        
+        document.getElementById('raceNumber').textContent = `#${this.currentRaceNumber}`;
+        document.getElementById('raceStatus').textContent = 'Đang đua!';
+        document.getElementById('timeLeft').textContent = `${this.raceDuration}s`;
+        document.getElementById('pauseBtn').disabled = false;
+        document.getElementById('replayBtn').disabled = true;
+
+        this.soundManager.init();
+        
+        // Show countdown before starting
+        this.showCountdown(() => {
+            this.soundManager.playStartSound();
+            this.animate();
+        });
+    }
+
+    createDuckElement(duck, index) {
+        const laneHeight = Math.max(1.5, Math.min(18, 520 / this.duckCount));
+        
+        // Create duck container
+        const duckEl = document.createElement('div');
+        duckEl.className = 'duck-element';
+        duckEl.style.top = `${index * laneHeight}px`;
+        duckEl.style.left = '0px';
+        
+        // Create duck icon
+        if (this.imagesLoaded && this.duckImages.length > 0) {
+            const iconIndex = (duck.id - 1) % this.duckImages.length;
+            const img = document.createElement('img');
+            img.src = this.duckImages[iconIndex].src;
+            img.className = 'duck-icon';
+            img.alt = duck.name;
+            duckEl.appendChild(img);
+        } else {
+            // Fallback colored circle
+            const circle = document.createElement('div');
+            circle.style.width = '30px';
+            circle.style.height = '30px';
+            circle.style.borderRadius = '50%';
+            circle.style.background = duck.color;
+            duckEl.appendChild(circle);
+        }
+        
+        // Create duck name label
+        const nameLabel = document.createElement('span');
+        nameLabel.className = 'duck-name';
+        nameLabel.textContent = duck.name.length > 20 ? duck.name.substring(0, 18) + '..' : duck.name;
+        duckEl.appendChild(nameLabel);
+        
+        this.trackContainer.appendChild(duckEl);
+        this.duckElements.set(duck.id, duckEl);
+    }
+
+    showCountdown(callback) {
+        let countdown = 3;
+        const countdownEl = document.createElement('div');
+        countdownEl.style.position = 'fixed';
+        countdownEl.style.top = '50%';
+        countdownEl.style.left = '50%';
+        countdownEl.style.transform = 'translate(-50%, -50%)';
+        countdownEl.style.fontSize = '120px';
+        countdownEl.style.fontWeight = 'bold';
+        countdownEl.style.color = '#FFD700';
+        countdownEl.style.textShadow = '0 0 30px rgba(255, 215, 0, 0.8)';
+        countdownEl.style.zIndex = '1000';
+        countdownEl.textContent = countdown;
+        document.body.appendChild(countdownEl);
+        
+        const interval = setInterval(() => {
+            countdown--;
+            if (countdown > 0) {
+                countdownEl.textContent = countdown;
+            } else if (countdown === 0) {
+                countdownEl.textContent = 'GO!';
+                countdownEl.style.color = '#00FF00';
+            } else {
+                clearInterval(interval);
+                document.body.removeChild(countdownEl);
+                callback();
+            }
+        }, 600);
+    }
+
+    pauseRace() {
+        if (!this.racePaused && this.raceStarted && !this.raceFinished) {
+            this.racePaused = true;
+            this.pausedTime = Date.now();
+            document.getElementById('pauseBtn').disabled = true;
+            document.getElementById('resumeBtn').disabled = false;
+            document.getElementById('raceStatus').textContent = 'Tạm dừng';
+        }
+    }
+
+    resumeRace() {
+        if (this.racePaused) {
+            this.racePaused = false;
+            const pauseDuration = Date.now() - this.pausedTime;
+            this.startTime += pauseDuration;
+            document.getElementById('pauseBtn').disabled = false;
+            document.getElementById('resumeBtn').disabled = true;
+            document.getElementById('raceStatus').textContent = 'Đang đua!';
+            this.animate();
+        }
+    }
+
+    animate(timestamp) {
+        if (!this.raceStarted || this.raceFinished || this.racePaused) return;
+
+        // Request next frame
+        this.animationId = requestAnimationFrame((ts) => this.animate(ts));
+
+        const elapsed = (Date.now() - this.startTime) / 1000;
+        const timeLeft = Math.max(0, this.raceDuration - elapsed);
+        document.getElementById('timeLeft').textContent = `${timeLeft.toFixed(1)}s`;
+        
+        // Update big timer
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = Math.floor(timeLeft % 60);
+        const milliseconds = Math.floor((timeLeft % 1) * 100);
+        document.getElementById('bigTimer').querySelector('.timer-display').textContent = 
+            `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}:${String(milliseconds).padStart(2, '0')}`;
+
+        // Check if any duck finished
+        const hasFinisher = this.ducks.some(duck => duck.position >= this.trackLength);
+        
+        if (hasFinisher) {
+            this.endRace();
+            return;
+        }
+
+        // Update duck positions (logic)
+        this.ducks.forEach(duck => duck.update(timestamp || Date.now()));
+
+        const oldRankings = [...this.rankings];
+        this.rankings = [...this.ducks].sort((a, b) => b.position - a.position);
+        this.checkHighlights(oldRankings, this.rankings);
+        
+        // Camera logic
+        if (this.rankings.length > 0) {
+            const leader = this.rankings[0];
+            const leaderProgress = leader.position / this.trackLength;
+            
+            if (leaderProgress >= 0.95 || this.raceFinished) {
+                const targetOffset = this.trackLength - this.viewportWidth;
+                this.cameraOffset += (targetOffset - this.cameraOffset) * 0.15;
+                // Show finish line
+                document.getElementById('finishLine').classList.remove('hidden');
+            } else {
+                const targetCameraOffset = leader.position - (this.viewportWidth * 0.6);
+                this.cameraOffset += (targetCameraOffset - this.cameraOffset) * 0.2;
+            }
+            
+            this.cameraOffset = Math.max(0, Math.min(this.trackLength - this.viewportWidth, this.cameraOffset));
+        }
+
+        if (this.replayData.length < 10000) {
+            this.replayData.push({
+                time: elapsed,
+                positions: this.ducks.map(d => ({ id: d.id, pos: d.position, finished: d.finished }))
+            });
+        }
+
+        // Update DOM (NO CANVAS DRAWING)
+        this.updateDuckPositions();
+        this.updateMinimap();
+        this.updateLeaderboard();
+    }
+
+    updateDuckPositions() {
+        // Update each duck's DOM element position
+        this.ducks.forEach(duck => {
+            const duckEl = this.duckElements.get(duck.id);
+            if (duckEl) {
+                const screenX = duck.position - this.cameraOffset;
+                duckEl.style.left = `${screenX}px`;
+                
+                // Add wobble effect via transform
+                const wobble = duck.getWobble(Date.now());
+                duckEl.style.transform = `translateY(${wobble}px)`;
+            }
+        });
+    }
+
+    updateMinimap() {
+        // Clear existing minimap ducks
+        this.minimapContainer.innerHTML = '';
+        
+        const trackWidth = 270; // minimap track width
+        
+        // Update viewport indicator
+        const viewportEl = document.getElementById('minimapViewport');
+        const cameraStartX = 15 + (this.cameraOffset / this.trackLength) * trackWidth;
+        const cameraWidth = (this.viewportWidth / this.trackLength) * trackWidth;
+        viewportEl.style.left = `${cameraStartX}px`;
+        viewportEl.style.width = `${cameraWidth}px`;
+        
+        // Draw duck dots (sample every 10th duck for performance)
+        for (let i = 0; i < this.ducks.length; i += Math.max(1, Math.floor(this.ducks.length / 100))) {
+            const duck = this.ducks[i];
+            const dotEl = document.createElement('div');
+            dotEl.className = 'minimap-duck';
+            dotEl.style.background = duck.color;
+            const x = (duck.position / this.trackLength) * trackWidth;
+            const y = Math.random() * 80 + 10; // Random y position
+            dotEl.style.left = `${x}px`;
+            dotEl.style.top = `${y}px`;
+            this.minimapContainer.appendChild(dotEl);
+        }
+    }
+
+    checkHighlights(oldRankings, newRankings) {
+        if (oldRankings.length === 0) return;
+
+        for (let i = 0; i < Math.min(10, newRankings.length); i++) {
+            const duck = newRankings[i];
+            const oldRank = oldRankings.findIndex(d => d.id === duck.id);
+            
+            if (oldRank > i && oldRank - i >= 3) {
+                this.addHighlight(`${duck.name} vượt lên ${oldRank - i} bậc! Hiện tại: Hạng ${i + 1}`);
+            }
+        }
+    }
+
+    addHighlight(message) {
+        const time = ((Date.now() - this.startTime) / 1000).toFixed(1);
+        this.highlights.unshift({ time, message });
+        if (this.highlights.length > 10) this.highlights.pop();
+        
+        const list = document.getElementById('highlightsList');
+        list.innerHTML = this.highlights.map(h => 
+            `<div class="highlight-item">[${h.time}s] ${h.message}</div>`
+        ).join('');
+    }
+
+    updateLeaderboard() {
+        // Only update every 10 frames to reduce DOM operations
+        if (!this._leaderboardUpdateCounter) this._leaderboardUpdateCounter = 0;
+        this._leaderboardUpdateCounter++;
+        if (this._leaderboardUpdateCounter % 10 !== 0) return;
+        
+        const list = document.getElementById('leaderboardList');
+        const top30 = this.rankings.slice(0, 30);
+        
+        let html = '<ol>';
+        top30.forEach((duck, index) => {
+            const progress = ((duck.position / this.trackLength) * 100).toFixed(1);
+            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
+            const colorDot = `<span style="display:inline-block;width:12px;height:12px;background:${duck.color};border-radius:50%;margin-right:5px;"></span>`;
+            html += `<li>${medal}${colorDot}${duck.name} - ${progress}%</li>`;
+        });
+        html += '</ol>';
+        
+        list.innerHTML = html;
+    }
+        // Chỉ update mỗi 10 frames để giảm DOM operations
+        if (!this._leaderboardUpdateCounter) this._leaderboardUpdateCounter = 0;
+        this._leaderboardUpdateCounter++;
+        if (this._leaderboardUpdateCounter % 10 !== 0) return;
+        
+        const list = document.getElementById('leaderboardList');
+        const top30 = this.rankings.slice(0, 30);
+        
+        let html = '<ol>';
+        top30.forEach((duck, index) => {
+            const progress = ((duck.position / this.trackLength) * 100).toFixed(1);
+            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
+            const colorDot = `<span style="display:inline-block;width:12px;height:12px;background:${duck.color};border-radius:50%;margin-right:5px;"></span>`;
+            html += `<li>${medal}${colorDot}${duck.name} - ${progress}%</li>`;
+        });
+        html += '</ol>';
+        
+        list.innerHTML = html;
+    }
+
+    endRace() {
+        this.raceFinished = true;
+        this.raceStarted = false;
+        
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+        }
+
+        this.rankings = [...this.ducks].sort((a, b) => b.position - a.position);
+        const winner = this.rankings[0];
+        
+        this.soundManager.playFinishSound();
+        setTimeout(() => this.soundManager.playCrowdCheer(), 300);
+
+        this.stats.totalRaces++;
+        if (this.rankings.indexOf(this.rankings[0]) < 3) {
+            this.stats.top3Finishes++;
+        }
+        this.saveStats();
+        this.updateStatsDisplay();
+
+        this.raceHistory.push({
+            raceNumber: this.currentRaceNumber,
+            winner: winner.id,
+            duckCount: this.duckCount,
+            duration: this.raceDuration,
+            timestamp: new Date().toLocaleString('vi-VN')
+        });
+
+        document.getElementById('raceStatus').textContent = 'Kết thúc!';
+        document.getElementById('timeLeft').textContent = '0s';
+        document.getElementById('pauseBtn').disabled = true;
+        document.getElementById('replayBtn').disabled = false;
+        
+        const resultPanel = document.getElementById('resultPanel');
+        resultPanel.classList.remove('hidden');
+
+        document.getElementById('resultTitle').innerHTML = '🏆 Cuộc Đua Kết Thúc!';
+        
+        let resultHTML = `
+            <div class="result-winner">
+                <h3>🏆 Nhà Vô Địch: ${winner.name} 🏆</h3>
+                <div style="width:30px;height:30px;background:${winner.color};border-radius:50%;margin:10px auto;"></div>
+            </div>
+            <div class="result-stats">
+                <p><strong>Top 3:</strong></p>
+                <p>🥇 ${this.rankings[0].name} - ${((this.rankings[0].position/this.trackLength)*100).toFixed(1)}%</p>
+                <p>🥈 ${this.rankings[1].name} - ${((this.rankings[1].position/this.trackLength)*100).toFixed(1)}%</p>
+                <p>🥉 ${this.rankings[2].name} - ${((this.rankings[2].position/this.trackLength)*100).toFixed(1)}%</p>
+            </div>
+        `;
+
+        document.getElementById('resultMessage').innerHTML = resultHTML;
+    }
+
+    toggleReplay() {
+        if (this.replayData.length === 0) return;
+        
+        this.replayMode = !this.replayMode;
+        
+        if (this.replayMode) {
+            this.replayFrame = 0;
+            document.getElementById('replayBtn').textContent = '⏹ Dừng Replay';
+            this.playReplay();
+        } else {
+            document.getElementById('replayBtn').textContent = '🔄 Replay';
+            if (this.animationId) {
+                cancelAnimationFrame(this.animationId);
+            }
+        }
+    }
+
+    playReplay() {
+        if (!this.replayMode || this.replayFrame >= this.replayData.length) {
+            this.replayMode = false;
+            document.getElementById('replayBtn').textContent = '🔄 Replay';
+            return;
+        }
+
+        const frame = this.replayData[this.replayFrame];
+        
+        frame.positions.forEach(p => {
+            const duck = this.ducks.find(d => d.id === p.id);
+            if (duck) {
+                duck.position = p.pos;
+                duck.finished = p.finished;
+            }
+        });
+
+        this.rankings = [...this.ducks].sort((a, b) => b.position - a.position);
+
+        // Update DOM instead of canvas drawing
+        this.updateDuckPositions();
+        this.updateMinimap();
+        this.updateLeaderboard();
+        
+        document.getElementById('timeLeft').textContent = `Replay: ${frame.time.toFixed(1)}s`;
+
+        this.replayFrame++;
+        this.animationId = requestAnimationFrame(() => this.playReplay());
+    }
+
+    viewHistory() {
+        if (this.raceHistory.length === 0) {
+            alert('Chưa có lịch sử đua!');
+            return;
+        }
+
+        const historyPanel = document.getElementById('historyPanel');
+        const historyList = document.getElementById('historyList');
+        
+        let html = '<table class="history-table"><thead><tr><th>Trận</th><th>Vô địch</th><th>Số vịt</th><th>Thời gian</th><th>Ngày giờ</th></tr></thead><tbody>';
+        
+        this.raceHistory.slice().reverse().forEach(race => {
+            html += `<tr>
+                <td>#${race.raceNumber}</td>
+                <td>Vịt #${race.winner}</td>
+                <td>${race.duckCount}</td>
+                <td>${race.duration}s</td>
+                <td>${race.timestamp}</td>
+            </tr>`;
+        });
+        
+        html += '</tbody></table>';
+        historyList.innerHTML = html;
+        
+        historyPanel.classList.remove('hidden');
+        document.getElementById('resultPanel').classList.add('hidden');
+    }
+
+    closeHistory() {
+        document.getElementById('historyPanel').classList.add('hidden');
+        document.getElementById('resultPanel').classList.remove('hidden');
+    }
+    
+    toggleFullscreen() {
+        const track = document.getElementById('raceTrack');
+        if (!document.fullscreenElement) {
+            // Fullscreen race track
+            track.requestFullscreen().catch(err => {
+                console.log('Fullscreen error:', err);
+            });
+            this.isFullscreen = true;
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+                this.isFullscreen = false;
+            }
+        }
+    }
+
+    reset() {
+        this.ducks = [];
+        this.duckElements.clear();
+        this.raceStarted = false;
+        this.raceFinished = false;
+        this.racePaused = false;
+        this.rankings = [];
+        this.highlights = [];
+        this.replayMode = false;
+        this.replayData = [];
+        
+        // Clear track
+        if (this.trackContainer) {
+            this.trackContainer.innerHTML = '';
+        }
+
+        document.getElementById('resultPanel').classList.add('hidden');
+        document.getElementById('historyPanel').classList.add('hidden');
+        document.getElementById('raceInfo').classList.add('hidden');
+        document.getElementById('controlPanel').classList.add('hidden');
+        document.getElementById('raceTrack').classList.add('hidden');
+        document.getElementById('minimap').classList.add('hidden');
+        document.getElementById('leaderboard').classList.add('hidden');
+        document.getElementById('highlightsPanel').classList.add('hidden');
+        document.getElementById('bigTimer').classList.add('hidden');
+        document.getElementById('finishLine').classList.add('hidden');
+
+        document.getElementById('settingsPanel').classList.remove('hidden');
+    }
+}
+
+console.log('Game class defined');
+const game = new Game();
+console.log('Game instance created');
