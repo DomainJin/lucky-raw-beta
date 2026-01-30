@@ -5228,108 +5228,108 @@ class Game {
     document.getElementById("resultMessage").innerHTML = resultHTML;
   }
 
-  showVictoryPopup(winner) {
-    console.log("Showing victory popup for:", winner.name);
-    const popup = document.getElementById("victoryPopup");
-    const winnerIconEl = document.getElementById("winnerIcon");
-    const winnerNameEl = document.getElementById("winnerName");
-    const winnerStatsEl = document.getElementById("winnerStats");
+  // showVictoryPopup(winner) {
+  //   console.log("Showing victory popup for:", winner.name);
+  //   const popup = document.getElementById("victoryPopup");
+  //   const winnerIconEl = document.getElementById("winnerIcon");
+  //   const winnerNameEl = document.getElementById("winnerName");
+  //   const winnerStatsEl = document.getElementById("winnerStats");
 
-    if (!popup) {
-      console.error("Victory popup element not found!");
-      return;
-    }
+  //   if (!popup) {
+  //     console.error("Victory popup element not found!");
+  //     return;
+  //   }
 
-    console.log("Popup element found:", popup);
+  //   console.log("Popup element found:", popup);
 
-    // If in fullscreen, append popup to fullscreen element
-    const fullscreenElement = document.fullscreenElement;
-    if (fullscreenElement && popup.parentElement !== fullscreenElement) {
-      console.log("Moving popup to fullscreen element");
-      fullscreenElement.appendChild(popup);
-    }
+  //   // If in fullscreen, append popup to fullscreen element
+  //   const fullscreenElement = document.fullscreenElement;
+  //   if (fullscreenElement && popup.parentElement !== fullscreenElement) {
+  //     console.log("Moving popup to fullscreen element");
+  //     fullscreenElement.appendChild(popup);
+  //   }
 
-    // Set winner icon với animation
-    if (this.imagesLoaded && this.duckImages.length > 0) {
-      const iconIndex = (winner.id - 1) % this.duckImages.length;
-      // Tạo img element với frame đầu tiên
-      const imgEl = document.createElement("img");
-      imgEl.src = this.duckImages[iconIndex][0].src;
-      imgEl.alt = winner.name;
-      imgEl.id = "winnerAnimatedIcon";
-      winnerIconEl.innerHTML = "";
-      winnerIconEl.appendChild(imgEl);
+  //   // Set winner icon với animation
+  //   if (this.imagesLoaded && this.duckImages.length > 0) {
+  //     const iconIndex = (winner.id - 1) % this.duckImages.length;
+  //     // Tạo img element với frame đầu tiên
+  //     const imgEl = document.createElement("img");
+  //     imgEl.src = this.duckImages[iconIndex][0].src;
+  //     imgEl.alt = winner.name;
+  //     imgEl.id = "winnerAnimatedIcon";
+  //     winnerIconEl.innerHTML = "";
+  //     winnerIconEl.appendChild(imgEl);
 
-      // Bắt đầu animation cho winner icon (nhanh hơn - mỗi 100ms)
-      this.winnerAnimationFrame = 0;
-      if (this.winnerAnimationInterval) {
-        clearInterval(this.winnerAnimationInterval);
-      }
-      this.winnerAnimationInterval = setInterval(() => {
-        this.winnerAnimationFrame = (this.winnerAnimationFrame + 1) % 3;
-        const animImgEl = document.getElementById("winnerAnimatedIcon");
-        if (
-          animImgEl &&
-          this.duckImages[iconIndex] &&
-          this.duckImages[iconIndex][this.winnerAnimationFrame]
-        ) {
-          animImgEl.src =
-            this.duckImages[iconIndex][this.winnerAnimationFrame].src;
-        }
-      }, 100); // 100ms = animation nhanh cho winner
-    } else {
-      winnerIconEl.innerHTML = `<div style="width:200px;height:200px;border-radius:50%;background:${winner.color};margin:0 auto;"></div>`;
-    }
+  //     // Bắt đầu animation cho winner icon (nhanh hơn - mỗi 100ms)
+  //     this.winnerAnimationFrame = 0;
+  //     if (this.winnerAnimationInterval) {
+  //       clearInterval(this.winnerAnimationInterval);
+  //     }
+  //     this.winnerAnimationInterval = setInterval(() => {
+  //       this.winnerAnimationFrame = (this.winnerAnimationFrame + 1) % 3;
+  //       const animImgEl = document.getElementById("winnerAnimatedIcon");
+  //       if (
+  //         animImgEl &&
+  //         this.duckImages[iconIndex] &&
+  //         this.duckImages[iconIndex][this.winnerAnimationFrame]
+  //       ) {
+  //         animImgEl.src =
+  //           this.duckImages[iconIndex][this.winnerAnimationFrame].src;
+  //       }
+  //     }, 100); // 100ms = animation nhanh cho winner
+  //   } else {
+  //     winnerIconEl.innerHTML = `<div style="width:200px;height:200px;border-radius:50%;background:${winner.color};margin:0 auto;"></div>`;
+  //   }
 
-    // Set winner name with code
-    winnerNameEl.textContent = this.getDisplayName(winner);
+  //   // Set winner name with code
+  //   winnerNameEl.textContent = this.getDisplayName(winner);
 
-    // Calculate finish time - prioritize synchronized time from control/display
-    let finishTime;
-    if (winner._displayFinishTime !== undefined) {
-      // Display mode: Use time sent from control
-      finishTime = winner._displayFinishTime.toFixed(2);
-      console.log(
-        "Victory popup - Using synchronized displayFinishTime:",
-        finishTime,
-      );
-    } else if (winner._controlFinishTime !== undefined) {
-      // Control mode: Use previously calculated time
-      finishTime = winner._controlFinishTime.toFixed(2);
-      console.log("Victory popup - Using controlFinishTime:", finishTime);
-    } else {
-      // Fallback: Calculate from current time (may be inaccurate on display)
-      finishTime = ((Date.now() - this.startTime) / 1000).toFixed(2);
-      console.log(
-        "Victory popup - Calculated finishTime:",
-        finishTime,
-        "Start:",
-        this.startTime,
-        "Now:",
-        Date.now(),
-      );
-    }
+  //   // Calculate finish time - prioritize synchronized time from control/display
+  //   let finishTime;
+  //   if (winner._displayFinishTime !== undefined) {
+  //     // Display mode: Use time sent from control
+  //     finishTime = winner._displayFinishTime.toFixed(2);
+  //     console.log(
+  //       "Victory popup - Using synchronized displayFinishTime:",
+  //       finishTime,
+  //     );
+  //   } else if (winner._controlFinishTime !== undefined) {
+  //     // Control mode: Use previously calculated time
+  //     finishTime = winner._controlFinishTime.toFixed(2);
+  //     console.log("Victory popup - Using controlFinishTime:", finishTime);
+  //   } else {
+  //     // Fallback: Calculate from current time (may be inaccurate on display)
+  //     finishTime = ((Date.now() - this.startTime) / 1000).toFixed(2);
+  //     console.log(
+  //       "Victory popup - Calculated finishTime:",
+  //       finishTime,
+  //       "Start:",
+  //       this.startTime,
+  //       "Now:",
+  //       Date.now(),
+  //     );
+  //   }
 
-    // Get prize name theo prizePosition
-    const prizeName = this.getPrizeName(winner.prizePosition || 1);
+  //   // Get prize name theo prizePosition
+  //   const prizeName = this.getPrizeName(winner.prizePosition || 1);
 
-    // Use winner.position if available, else fallback to 1
-    const winnerPos = winner.position || 1;
-    winnerStatsEl.innerHTML = `
-        <p><strong>🏆 Prize:</strong> ${prizeName}</p>
-        <p><strong>🕒 Time:</strong> ${finishTime}s</p>
-        <p><strong>📍 Position:</strong> ${winnerPos}${this.getPositionSuffix(winnerPos)}</p>
-      `;
+  //   // Use winner.position if available, else fallback to 1
+  //   const winnerPos = winner.position || 1;
+  //   winnerStatsEl.innerHTML = `
+  //       <p><strong>🏆 Prize:</strong> ${prizeName}</p>
+  //       <p><strong>🕒 Time:</strong> ${finishTime}s</p>
+  //       <p><strong>📍 Position:</strong> ${winnerPos}${this.getPositionSuffix(winnerPos)}</p>
+  //     `;
 
-    // Show popup with animation
-    popup.style.display = "flex";
-    popup.classList.remove("hidden");
-    console.log("Popup classes after remove hidden:", popup.classList);
-    setTimeout(() => {
-      popup.classList.add("show");
-      console.log("Added show class, popup should be visible now");
-    }, 10);
-  }
+  //   // Show popup with animation
+  //   popup.style.display = "flex";
+  //   popup.classList.remove("hidden");
+  //   console.log("Popup classes after remove hidden:", popup.classList);
+  //   setTimeout(() => {
+  //     popup.classList.add("show");
+  //     console.log("Added show class, popup should be visible now");
+  //   }, 10);
+  // }
 
   closeVictoryPopup() {
     const popup = document.getElementById("victoryPopup");
