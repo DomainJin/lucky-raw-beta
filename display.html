@@ -92,7 +92,7 @@
         /* Allow result-panel to show on display */
         .result-panel {
             display: none; /* hidden by default */
-            background: transparent !important; /* Transparent by default */
+            background: url('static/lucky.png') center center/cover no-repeat !important;
         }
         
         .result-panel.fullscreen {
@@ -323,6 +323,7 @@
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
+            background: linear-gradient(135deg, #ffe259 0%, #f6d365 100%) !important; /* Vàng sáng */
         }
         
         /* Victory overlay - fill entire popup container */
@@ -342,6 +343,7 @@
             aspect-ratio: 1 / 1 !important; /* Force square based on height */
             border-radius: 50% !important; /* Make it circular */
             padding: 0 !important;
+            background: linear-gradient(135deg, #ff512f 0%, #f09819 100%) !important; /* Đỏ cam */
             box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4),
                         inset 0 0 50px rgba(0, 0, 0, 0.3),
                         0 0 50px rgba(102, 126, 234, 0.3) !important;
@@ -431,6 +433,7 @@
             aspect-ratio: auto !important;
             border-radius: 20px !important;
             padding: 1.5% !important;
+            background: linear-gradient(135deg, #ff512f 0%, #f09819 100%) !important; /* Đỏ cam */
             box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4),
                         inset 0 0 50px rgba(0, 0, 0, 0.3),
                         0 0 50px rgba(102, 126, 234, 0.3) !important;
@@ -762,6 +765,11 @@
                         // Start sending
                         sendIconsLoaded();
                     }
+
+
+
+
+
                 }, 100);
             } catch (error) {
                 console.error('❌ ERROR creating Game instance:', error);
@@ -787,6 +795,16 @@
                                                 displayGame.closeTopNVictoryPopup();
                                             }
                                             break;
+                    case 'UPDATE_DUCK_SIZE':
+    if (displayGame) {
+        console.log('🦆 UPDATE_DUCK_SIZE received in display:', data);
+        displayGame.duckSizeRatio = data.duckSizeRatio;
+        // If you have a method to force redraw, call it here:
+        if (typeof displayGame.updateDuckPositionsCanvas === 'function') {
+            displayGame.updateDuckPositionsCanvas();
+        }
+    }
+    break;
                     case 'START_RACE':
                         console.log('🏁 START_RACE message received');
                         handleStartRace(data);
@@ -838,6 +856,29 @@
                     case 'UPDATE_RESULT_PANEL_SETTINGS':
                         console.log('🎨 UPDATE_RESULT_PANEL_SETTINGS received:', data);
                         handleUpdateResultPanelSettings(data);
+                        break;
+                    case 'FINISH_SAFE_ZONE_UPDATED':
+                        console.log('📏 FINISH_SAFE_ZONE_UPDATED received:', data);
+                        if (displayGame) {
+                            displayGame.finishSafeZone = data.finishSafeZone;
+                            // If displayGame has method to update lane management visuals, call it
+                            if (typeof displayGame.updateDuckPositionsCanvas === 'function') {
+                                displayGame.updateDuckPositionsCanvas();
+                            }
+                        }
+                        break;
+                    case 'FINISH_STAGGER_UPDATED':
+                        console.log('📐 FINISH_STAGGER_UPDATED received:', data);
+                        if (displayGame) {
+                            displayGame.finishStaggerEnabled = !!data.finishStaggerEnabled;
+                            if (typeof displayGame.finalizeFinishers === 'function') {
+                                // Re-run finalizer so display shows or hides offsets accordingly
+                                displayGame.finalizeFinishers();
+                            }
+                            if (typeof displayGame.updateDuckPositionsCanvas === 'function') {
+                                displayGame.updateDuckPositionsCanvas();
+                            }
+                        }
                         break;
                     case 'REQUEST_ICONS_STATUS':
                         // Control is requesting icon status - reply immediately
@@ -992,21 +1033,50 @@
         }
         
         function handleRaceFinished(data) {
-            console.log('Race finished on display - stopping animation');
+            console.log('Race finished on display - finalizing visuals');
             if (displayGame) {
-                // Stop animation loop immediately
+                // Mark race finished state so logic can render final visuals
                 displayGame.raceStarted = false;
                 displayGame.raceFinished = true;
-                
-                if (displayGame.animationId) {
-                    cancelAnimationFrame(displayGame.animationId);
-                    displayGame.animationId = null;
+
+                // Ensure ducks that passed finish line are marked finished (safety)
+                try {
+                    const FINISH_LINE_OFFSET = typeof FINISH_LINE_OFFSET !== 'undefined' ? FINISH_LINE_OFFSET : 75;
+                    displayGame.ducks.forEach(d => {
+                        if (d.position >= displayGame.trackLength - FINISH_LINE_OFFSET) d.finished = true;
+                    });
+                    // If the RACE_FINISHED message included winners, mark them explicitly too
+                    const winners = data && (data.winners || (data.winner ? [data.winner] : null));
+                    if (winners && winners.length > 0) {
+                        winners.forEach(w => {
+                            // Match by id or name if provided
+                            const duckObj = displayGame.ducks.find(dd => dd.id === w.id || dd.name === w.name || dd.name === w);
+                            if (duckObj) duckObj.finished = true;
+                        });
+                    }
+                } catch (e) {
+                    console.warn('Error marking finishers:', e);
                 }
-                
-                // Stop all sounds
-                displayGame.soundManager.stopRacingAmbiance();
-                
-                console.log('✅ Display animation stopped');
+
+                // Force a final DOM update so name transitions (duck-name) happen immediately
+                try {
+                    if (typeof displayGame.finalizeFinishers === 'function') displayGame.finalizeFinishers();
+                    if (typeof displayGame.redistributeDucks === 'function') displayGame.redistributeDucks();
+                    if (typeof displayGame.updateDuckPositions === 'function') displayGame.updateDuckPositions();
+                } catch (e) {
+                    console.warn('Error during final update:', e);
+                }
+
+                // Give small time for CSS transitions to run, then stop animation and sounds
+                setTimeout(() => {
+                    if (displayGame.animationId) {
+                        cancelAnimationFrame(displayGame.animationId);
+                        displayGame.animationId = null;
+                    }
+                    // Stop all sounds
+                    if (displayGame.soundManager) displayGame.soundManager.stopRacingAmbiance();
+                    console.log('✅ Display animation stopped after finalizing visuals');
+                }, 350); // ~1 frame + transition start time
             }
         }
         
