@@ -206,15 +206,25 @@
             id="duckSizeRatio"
             min="10"
             max="100"
-            value="100"
+            value="50"
             step="1"
             oninput="
-              console.log('[DuckSize][slider] oninput value:', this.value);
+              document.getElementById('duckSizeValue').textContent =
+                this.value + '%'
+            "
+          />
+          <button
+            id="applyDuckSizeBtn"
+            type="button"
+            style="margin-left: 12px; vertical-align: middle"
+            onclick="
               if (window.game) {
-                game.setDuckSizeRatio(this.value);
-                game.forceUpdateDuckSize();
-                const ratio = parseFloat(this.value) / 100;
-                if (game.displayChannel && game.displayReady) {
+                var val = document.getElementById('duckSizeRatio').value;
+                game.setDuckSizeRatio(val);
+                game.forceUpdateDuckSize && game.forceUpdateDuckSize();
+                // Gửi sang display luôn, không cần kiểm tra displayReady
+                var ratio = parseFloat(val) / 100;
+                if (game.displayChannel) {
                   game.displayChannel.postMessage({
                     type: 'UPDATE_DUCK_SIZE',
                     duckSizeRatio: ratio,
@@ -226,7 +236,9 @@
                 }
               }
             "
-          />
+          >
+            Apply
+          </button>
           <small style="color: #888"
             >Adjust duck icon size relative to track height (10%–100%).</small
           >
@@ -1075,7 +1087,7 @@
               var activeStr = new Date(item.active).toLocaleString();
               var revokeStr = new Date(item.revoke).toLocaleString();
               var expired = Date.now() > item.revoke;
-              html += `<li><span style="color:${expired ? "#ff7675" : "#00b894"}">${item.username}</span> <span style="font-size:13px;">(Hiệu lực: ${activeStr} - ${revokeStr})</span> <button onclick=\"removeAccount('${item.username}')\" style=\"color:#fff;background:#e17055;border:none;border-radius:4px;padding:2px 8px;margin-left:8px;cursor:pointer;\">Xóa</button></li>`;
+              html += `<li><span style="color:${expired ? "#ff7675" : "#00b894"}">${item.username}</span> <span style="font-size:13px;">(Hiệu lực: ${activeStr} - ${revokeStr})</span> <button onclick="removeAccount('${item.username}')" style="color:#fff;background:#e17055;border:none;border-radius:4px;padding:2px 8px;margin-left:8px;cursor:pointer;">Xóa</button></li>`;
             });
             html += "</ul>";
           }

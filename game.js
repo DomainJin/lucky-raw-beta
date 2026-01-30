@@ -854,7 +854,7 @@ class Game {
     this.duckVisualSpeed = 0; // Visual animation speed when background stops
     this.viewportWidth = 0;
     this.trackHeight = 0;
-    this.duckSizeRatio = 0.5; // global ratio: duck height = trackHeight * duckSizeRatio
+    this.duckSizeRatio = 0.5; // global ratio: duck height = trackHeight * duckSizeRatio (default 50%)
     this.isFullscreen = false;
 
     this.stats = this.loadStats();
@@ -1383,7 +1383,14 @@ class Game {
 
   loadResultBackgroundImage(event) {
     const file = event.target.files[0];
-    if (!file) return;
+    if (!file) {
+      // If no file selected, set default to lucky.png
+      localStorage.setItem("resultPanelBackgroundImage", "static/lucky.png");
+      console.log(
+        "No file selected. Set result panel background to static/lucky.png",
+      );
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -3608,7 +3615,9 @@ class Game {
 
       // Show victory popup after delay
       setTimeout(() => {
-        this.showVictoryPopup(winner);
+        // Dùng chung popup Top N cho cả 1 winner
+        this.currentRaceWinners = [winner];
+        this.showTopNVictoryPopup();
       }, 3000); // 3 second delay to see racer finish clearly
     }
 
@@ -4081,7 +4090,7 @@ class Game {
       const clusterTarget = clusterCenter - this.viewportWidth * 0.5; // center cluster in viewport
 
       // Determine which camera stream to use based on race progress
-      const halfTime = (this.raceDuration || 1) * 0.15; // fallback to 1s if undefined (30% race -> switch to leader)
+      const halfTime = (this.raceDuration || 1) * 0.09; // fallback to 1s if undefined (30% race -> switch to leader)
       const transitionDuration = 2.0; // seconds to blend between streams
       const elapsedSec = elapsed; // already computed above
 
