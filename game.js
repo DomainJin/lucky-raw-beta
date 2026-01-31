@@ -5747,12 +5747,15 @@ class Game {
   }
 
   fullReset() {
-    // Reset hoàn toàn bao gồm cả winners
+    // Reset hoàn toàn bao gồm cả winners và lịch sử
     localStorage.clear(); // Xóa toàn bộ localStorage khi restart
     this.winners = [];
     this.excludedDucks = [];
     this.activeDuckNames = [...this.duckNames]; // Reset về danh sách ban đầu
     this.activeDuckCodes = [...this.duckCodes]; // Reset codes as well
+    this.raceHistory = [];
+    // Xoá raceHistory khỏi localStorage nếu có
+    localStorage.removeItem("raceHistory");
     this.saveWinners();
 
     // Đóng popup victory nếu còn hiển thị
