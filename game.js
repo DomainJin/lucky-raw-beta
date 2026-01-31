@@ -3615,7 +3615,8 @@ class Game {
 
       // Show victory popup after delay
       setTimeout(() => {
-        // Dùng chung popup Top N cho cả 1 winner
+        // Dùng chung popup Top N cho cả 1 winner, luôn set prize theo index
+        winner.prizePosition = this.winners.length; // index của winner trong danh sách tổng
         this.currentRaceWinners = [winner];
         this.showTopNVictoryPopup();
       }, 3000); // 3 second delay to see racer finish clearly
@@ -5374,11 +5375,22 @@ class Game {
       topNCountEl.textContent = winnersToShow.length;
     }
 
-    // Build winners grid - show only current race winners
+    // Đảm bảo không trùng giải: lấy index trong winnersToShow làm prize index, không lấy prize đã trao
+    let usedPrizeIndexes = new Set();
     let winnersHTML = "";
     winnersToShow.forEach((winner, index) => {
-      // Vị trí giải thưởng thực tế lấy từ winner.prizePosition
-      const prizePosition = winner.prizePosition || index + 1;
+      // Prize index = index + 1 (giải 1, 2, 3...)
+      let prizePosition = index + 1;
+      // Nếu winner đã có prizePosition (ví dụ pop-up lại), thì lấy luôn, nhưng phải không trùng
+      if (winner.prizePosition && !usedPrizeIndexes.has(winner.prizePosition)) {
+        prizePosition = winner.prizePosition;
+      }
+      // Đảm bảo không trùng giải
+      while (usedPrizeIndexes.has(prizePosition)) {
+        prizePosition++;
+      }
+      usedPrizeIndexes.add(prizePosition);
+
       const medal =
         prizePosition === 1
           ? "🥇"
