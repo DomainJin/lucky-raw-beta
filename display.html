@@ -637,11 +637,17 @@
         </div>
     </div>
 
-    <script src="game.js?v=60"></script>
-    <script>
+    <script type="module" src="game.js?v=61"></script>
+    <script type="module">
+        // Import Game class
+        import { Game } from './game.js?v=61';
+        
         // Display mode - sync with main window via BroadcastChannel
         const displayChannel = new BroadcastChannel('race_display');
         let displayGame = null;
+        
+        // Make displayGame globally accessible for inline event handlers
+        window.displayGame = displayGame;
 
     // Đảm bảo nút Next Race sẽ tắt popup và reset trạng thái cho lần đua kế tiếp
     document.addEventListener('DOMContentLoaded', function() {
@@ -659,7 +665,7 @@
         }
     });
         
-        window.addEventListener('load', function() {
+        window.addEventListener('load', async function() {
             console.log('=== DISPLAY WINDOW LOAD EVENT ===');
             console.log('Display mode initialized');
             console.log('BroadcastChannel created');
@@ -668,9 +674,13 @@
             initButterflyCursor();
             
             try {
+                // Import Game class dynamically
+                const { Game } = await import('./game.js?v=61');
+                
                 // Create game instance for display with isDisplayMode=true
                 console.log('Creating Game instance in display mode...');
                 displayGame = new Game(true); // Pass true for isDisplayMode
+                window.displayGame = displayGame; // Make globally accessible
                 console.log('✅ Game instance created, isDisplayMode:', displayGame.isDisplayMode);
                 
                 // Load icons immediately when display opens

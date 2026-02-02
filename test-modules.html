@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Module Test - Lucky Draw</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: #1a1a1a;
+        color: #fff;
+        padding: 20px;
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      .test-section {
+        background: #2a2a2a;
+        border: 2px solid #444;
+        border-radius: 8px;
+        padding: 16px;
+        margin: 16px 0;
+      }
+      .test-section h2 {
+        color: #ffd700;
+        margin-top: 0;
+      }
+      .success {
+        color: #00ff00;
+        font-weight: bold;
+      }
+      .error {
+        color: #ff4444;
+        font-weight: bold;
+      }
+      .test-result {
+        margin: 8px 0;
+        padding: 8px;
+        background: #1a1a1a;
+        border-radius: 4px;
+        font-family: "Courier New", monospace;
+      }
+      button {
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        margin: 4px;
+      }
+      button:hover {
+        background: #5568d3;
+      }
+      #log {
+        background: #0a0a0a;
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 12px;
+        margin-top: 16px;
+        max-height: 300px;
+        overflow-y: auto;
+        font-family: "Courier New", monospace;
+        font-size: 12px;
+      }
+      .log-entry {
+        margin: 2px 0;
+      }
+      .log-success {
+        color: #00ff00;
+      }
+      .log-error {
+        color: #ff4444;
+      }
+      .log-info {
+        color: #67e8f9;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🧪 Module Test Suite</h1>
+    <p>Testing modular architecture for Lucky Draw game</p>
+
+    <!-- Constants Test -->
+    <div class="test-section">
+      <h2>1. Constants Module</h2>
+      <div id="constants-result" class="test-result">Loading...</div>
+    </div>
+
+    <!-- SoundManager Test -->
+    <div class="test-section">
+      <h2>2. SoundManager Module</h2>
+      <div id="sound-result" class="test-result">Loading...</div>
+      <button onclick="testSound()">Test Sound Playback</button>
+    </div>
+
+    <!-- Duck Test -->
+    <div class="test-section">
+      <h2>3. Duck Module</h2>
+      <div id="duck-result" class="test-result">Loading...</div>
+      <button onclick="testDuckPhysics()">Test Duck Physics</button>
+    </div>
+
+    <!-- Game Integration Test -->
+    <div class="test-section">
+      <h2>4. Game Integration</h2>
+      <div id="game-result" class="test-result">Loading...</div>
+      <button onclick="testGameIntegration()">Test Game Creation</button>
+    </div>
+
+    <!-- Console Log -->
+    <div class="test-section">
+      <h2>📋 Test Log</h2>
+      <div id="log"></div>
+      <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script type="module">
+      // Import all modules
+      import {
+        FINISH_LINE_OFFSET,
+        MINIMUM_PARTICIPANTS,
+        safeElementAction,
+      } from "./src/utils/constants.js";
+      import { SoundManager } from "./src/audio/SoundManager.js";
+      import { Duck } from "./src/entities/Duck.js";
+
+      // Logging helper
+      function log(message, type = "info") {
+        const logDiv = document.getElementById("log");
+        const entry = document.createElement("div");
+        entry.className = `log-entry log-${type}`;
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logDiv.appendChild(entry);
+        logDiv.scrollTop = logDiv.scrollHeight;
+      }
+
+      window.clearLog = function () {
+        document.getElementById("log").innerHTML = "";
+      };
+
+      // Test 1: Constants
+      function testConstants() {
+        try {
+          const result = document.getElementById("constants-result");
+          let html = "";
+
+          // Test FINISH_LINE_OFFSET
+          if (
+            typeof FINISH_LINE_OFFSET === "number" &&
+            FINISH_LINE_OFFSET === 75
+          ) {
+            html +=
+              '<span class="success">✓</span> FINISH_LINE_OFFSET = 75<br>';
+            log("FINISH_LINE_OFFSET test passed", "success");
+          } else {
+            html +=
+              '<span class="error">✗</span> FINISH_LINE_OFFSET failed<br>';
+            log("FINISH_LINE_OFFSET test failed", "error");
+          }
+
+          // Test MINIMUM_PARTICIPANTS
+          if (
+            typeof MINIMUM_PARTICIPANTS === "number" &&
+            MINIMUM_PARTICIPANTS === 5
+          ) {
+            html +=
+              '<span class="success">✓</span> MINIMUM_PARTICIPANTS = 5<br>';
+            log("MINIMUM_PARTICIPANTS test passed", "success");
+          } else {
+            html +=
+              '<span class="error">✗</span> MINIMUM_PARTICIPANTS failed<br>';
+            log("MINIMUM_PARTICIPANTS test failed", "error");
+          }
+
+          // Test safeElementAction
+          if (typeof safeElementAction === "function") {
+            const testDiv = document.createElement("div");
+            testDiv.id = "test-element";
+            document.body.appendChild(testDiv);
+
+            let actionCalled = false;
+            safeElementAction("test-element", (el) => {
+              actionCalled = true;
+            });
+
+            document.body.removeChild(testDiv);
+
+            if (actionCalled) {
+              html +=
+                '<span class="success">✓</span> safeElementAction works<br>';
+              log("safeElementAction test passed", "success");
+            } else {
+              html +=
+                '<span class="error">✗</span> safeElementAction failed<br>';
+              log("safeElementAction test failed", "error");
+            }
+          }
+
+          result.innerHTML = html;
+        } catch (error) {
+          document.getElementById("constants-result").innerHTML =
+            `<span class="error">✗ Error: ${error.message}</span>`;
+          log(`Constants test error: ${error.message}`, "error");
+        }
+      }
+
+      // Test 2: SoundManager
+      function testSoundManager() {
+        try {
+          const result = document.getElementById("sound-result");
+          let html = "";
+
+          const soundMgr = new SoundManager();
+
+          if (soundMgr instanceof SoundManager) {
+            html +=
+              '<span class="success">✓</span> SoundManager instance created<br>';
+            log("SoundManager instance created", "success");
+          }
+
+          if (typeof soundMgr.playStartSound === "function") {
+            html +=
+              '<span class="success">✓</span> playStartSound method exists<br>';
+            log("playStartSound method exists", "success");
+          }
+
+          if (typeof soundMgr.startRacingAmbiance === "function") {
+            html +=
+              '<span class="success">✓</span> startRacingAmbiance method exists<br>';
+            log("startRacingAmbiance method exists", "success");
+          }
+
+          if (typeof soundMgr.playFinishSound === "function") {
+            html +=
+              '<span class="success">✓</span> playFinishSound method exists<br>';
+            log("playFinishSound method exists", "success");
+          }
+
+          result.innerHTML = html;
+          window.testSoundMgr = soundMgr; // Store for button test
+        } catch (error) {
+          document.getElementById("sound-result").innerHTML =
+            `<span class="error">✗ Error: ${error.message}</span>`;
+          log(`SoundManager test error: ${error.message}`, "error");
+        }
+      }
+
+      window.testSound = function () {
+        if (window.testSoundMgr) {
+          window.testSoundMgr.playBeep(440, 0.3, 0.5); // Play a beep
+          log("Test beep played (440Hz, 0.5s)", "info");
+        }
+      };
+
+      // Test 3: Duck
+      function testDuck() {
+        try {
+          const result = document.getElementById("duck-result");
+          let html = "";
+
+          const duck = new Duck(1, 1000, "Test Duck");
+
+          if (duck instanceof Duck) {
+            html += '<span class="success">✓</span> Duck instance created<br>';
+            log("Duck instance created", "success");
+          }
+
+          if (duck.id === 1 && duck.name === "Test Duck") {
+            html +=
+              '<span class="success">✓</span> Duck properties initialized correctly<br>';
+            log("Duck properties initialized", "success");
+          }
+
+          if (typeof duck.update === "function") {
+            html +=
+              '<span class="success">✓</span> Duck.update method exists<br>';
+            log("Duck.update method exists", "success");
+          }
+
+          if (typeof duck.getSpeedIndicator === "function") {
+            html +=
+              '<span class="success">✓</span> Duck.getSpeedIndicator method exists<br>';
+            log("Duck.getSpeedIndicator method exists", "success");
+          }
+
+          // Test physics
+          const initialPos = duck.position;
+          duck.update(0, 1, 10, 1.0, false);
+          if (duck.position !== initialPos) {
+            html +=
+              '<span class="success">✓</span> Duck physics update working<br>';
+            log(`Duck moved from ${initialPos} to ${duck.position}`, "success");
+          }
+
+          result.innerHTML = html;
+          window.testDuck = duck; // Store for button test
+        } catch (error) {
+          document.getElementById("duck-result").innerHTML =
+            `<span class="error">✗ Error: ${error.message}</span>`;
+          log(`Duck test error: ${error.message}`, "error");
+        }
+      }
+
+      window.testDuckPhysics = function () {
+        if (window.testDuck) {
+          const duck = window.testDuck;
+          const before = duck.position.toFixed(2);
+
+          // Simulate 60 frames
+          for (let i = 0; i < 60; i++) {
+            duck.update(i, 1, 10, 1.0, false);
+          }
+
+          const after = duck.position.toFixed(2);
+          log(
+            `Duck physics simulation: moved from ${before} to ${after} px`,
+            "info",
+          );
+        }
+      };
+
+      // Test 4: Game Integration
+      window.testGameIntegration = async function () {
+        try {
+          const result = document.getElementById("game-result");
+          result.innerHTML = '<span class="success">Testing...</span>';
+          log("Starting Game integration test", "info");
+
+          // Try to import and create Game instance
+          const { Game } = await import("./game.js?v=61");
+
+          if (typeof Game === "function") {
+            result.innerHTML =
+              '<span class="success">✓ Game class imported successfully</span><br>';
+            log("Game class imported", "success");
+
+            // Check if global game instance exists
+            if (window.game && window.game instanceof Game) {
+              result.innerHTML +=
+                '<span class="success">✓ Global game instance available</span><br>';
+              log("Global game instance accessible", "success");
+
+              // Test some properties
+              if (window.game.soundManager instanceof SoundManager) {
+                result.innerHTML +=
+                  '<span class="success">✓ Game uses SoundManager module</span><br>';
+                log("Game correctly uses SoundManager module", "success");
+              }
+            }
+          } else {
+            result.innerHTML =
+              '<span class="error">✗ Failed to import Game class</span>';
+            log("Failed to import Game class", "error");
+          }
+        } catch (error) {
+          document.getElementById("game-result").innerHTML =
+            `<span class="error">✗ Error: ${error.message}</span>`;
+          log(`Game integration test error: ${error.message}`, "error");
+        }
+      };
+
+      // Run all tests on load
+      window.addEventListener("load", () => {
+        log("Starting module tests...", "info");
+        testConstants();
+        testSoundManager();
+        testDuck();
+        log("All automatic tests completed", "success");
+        log("Click buttons to test interactive features", "info");
+      });
+
+      // Export for debugging
+      window.moduleTests = {
+        FINISH_LINE_OFFSET,
+        MINIMUM_PARTICIPANTS,
+        safeElementAction,
+        SoundManager,
+        Duck,
+      };
+
+      log("Module test suite loaded", "success");
+    </script>
+  </body>
+</html>

@@ -160,6 +160,87 @@
       <!-- Game Settings -->
       <div class="settings-panel" id="settingsPanel">
         <h2>Race Settings</h2>
+
+        <!-- Simplified Prize Setup (Top Priority) -->
+        <div
+          style="
+            padding: 20px;
+            margin-bottom: 20px;
+            background: rgba(255, 215, 0, 0.15);
+            border: 2px solid #ffd700;
+            border-radius: 8px;
+          "
+        >
+          <h3 style="color: #ffd700; margin: 0 0 15px 0; font-size: 18px">
+            🏆 Tạo Script Đua
+          </h3>
+          <div style="display: flex; gap: 10px; margin-bottom: 12px">
+            <input
+              type="text"
+              id="simplePrizeName"
+              placeholder="Tên giải (VD: Giải Nhất)"
+              style="
+                flex: 2;
+                padding: 12px;
+                background: #222;
+                color: white;
+                border: 1px solid #444;
+                border-radius: 5px;
+                font-size: 14px;
+              "
+            />
+            <input
+              type="number"
+              id="simplePrizeCount"
+              value="1"
+              min="1"
+              placeholder="Số người"
+              style="
+                flex: 1;
+                padding: 12px;
+                background: #222;
+                color: white;
+                border: 1px solid #444;
+                border-radius: 5px;
+                max-width: 100px;
+                font-size: 14px;
+              "
+            />
+            <button
+              class="btn"
+              onclick="game.addRaceScript()"
+              style="
+                background: #27ae60;
+                padding: 12px 20px;
+                margin: 0;
+                font-size: 14px;
+                white-space: nowrap;
+              "
+            >
+              + Tạo Script
+            </button>
+          </div>
+          <div
+            id="raceScriptsList"
+            style="
+              background: rgba(0, 0, 0, 0.4);
+              border-radius: 5px;
+              padding: 12px;
+              min-height: 60px;
+              color: white;
+              font-size: 13px;
+              max-height: 300px;
+              overflow-y: auto;
+              border: 1px solid #444;
+            "
+          >
+            <i style="color: #888">Chưa có script nào được tạo...</i>
+          </div>
+          <small style="color: #888; display: block; margin-top: 8px">
+            💡 Mỗi script = 1 lần đua. Nhấn START để chạy đua với giải đó
+          </small>
+        </div>
+
         <div class="input-group">
           <label for="duckCount">Number of Racers:</label>
           <input
@@ -175,7 +256,7 @@
           <input type="number" id="raceDuration" min="5" max="300" value="30" />
         </div>
 
-        <div class="input-group">
+        <!-- <div class="input-group">
           <label for="gameSpeed"
             >Game Speed: <span id="gameSpeedValue">1.0x</span></label
           >
@@ -197,7 +278,7 @@
           >
         </div>
 
-        <div class="input-group">
+        <!-- <div class="input-group">
           <label for="duckSizeRatio"
             >Duck Size: <span id="duckSizeValue">50%</span></label
           >
@@ -242,13 +323,13 @@
           <small style="color: #888"
             >Adjust duck icon size relative to track height (10%–100%).</small
           >
-        </div>
+        </div> -->
 
         <div class="input-group">
           <!-- Race Mode selection removed: now auto by number of winners -->
         </div>
 
-        <div class="input-group">
+        <!-- <div class="input-group">
           <label for="finishSafeZone"
             >Finish Safe Zone (px):
             <span id="finishSafeZoneValue">0px</span></label
@@ -287,6 +368,17 @@
           >
         </div>
         <div class="input-group">
+          <button
+            class="btn"
+            onclick="game.showCurrentSettings()"
+            style="background: #27ae60; width: 100%; margin-top: 10px"
+          >
+            📋 Show Current Settings
+          </button>
+        </div> -->
+
+        <!-- Number of Winners: Hidden, auto-calculated from prizes -->
+        <!-- <div class="input-group" style="display: none">
           <label for="winnerCount">Number of Winners:</label>
           <input
             type="number"
@@ -306,7 +398,8 @@
           <small style="color: #888"
             >Set 1 for Normal mode, >1 for Top N mode</small
           >
-        </div>
+        </div> -->
+
         <div class="input-group">
           <label for="duckNamesFile" id="fileLabel"
             >Racer List File (CSV/Excel):</label
@@ -347,7 +440,7 @@
           </label>
         </div>
 
-        <div class="input-group">
+        <!-- <div class="input-group">
           <label for="forceClusterToggle">
             <input
               type="checkbox"
@@ -362,7 +455,7 @@
             >When enabled, camera will focus on densest pack (useful for
             testing)</small
           >
-        </div>
+        </div> -->
         <div class="input-group">
           <label for="customSoundFile">Custom Race Sound (MP3):</label>
           <input
@@ -375,31 +468,285 @@
             >Optional: Upload custom racing ambiance sound</small
           >
         </div>
+        <div
+          class="main-panel-background-settings"
+          style="font-size: 14px; color: #fff; margin: 20px 0 10px 0"
+        >
+          Background Settings
 
-        <div class="input-group" style="margin-top: 20px">
-          <a
-            href="display.html"
-            target="_blank"
-            class="btn btn-secondary"
-            id="openDisplayBtn"
+          <div
             style="
-              width: 100%;
-              margin-bottom: 10px;
-              text-align: center;
-              text-decoration: none;
-              display: inline-block;
-              pointer-events: none;
-              opacity: 0.5;
+              margin-top: 15px;
+              padding: 10px;
+              background: rgba(102, 126, 234, 0.1);
+              border-radius: 5px;
             "
           >
-            ⏳ Loading Icons...
-          </a>
-          <small style="color: #ffd700; font-weight: bold">📺 </small><br />
-          <small style="color: #888"></small>
+            <h4 style="color: #667eea; font-size: 16px; margin: 0 0 10px 0">
+              📐 Layout Settings
+            </h4>
+            <div
+              style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px"
+            >
+              <div style="display: flex; flex-direction: column; gap: 5px">
+                <label style="font-size: 14px; color: #fff"
+                  >Race Track Aspect Ratio:</label
+                >
+                <input
+                  type="text"
+                  id="raceTrackAspectRatio"
+                  value="20:5"
+                  placeholder="e.g., 16:9, 30:9, 21:9"
+                  style="
+                    padding: 8px;
+                    background: rgba(0, 0, 0, 0.3);
+                    border: 1px solid #667eea;
+                    border-radius: 5px;
+                    color: #fff;
+                    font-size: 14px;
+                  "
+                  oninput="validateAspectRatioInput(this)"
+                />
+                <small style="color: #888; font-size: 12px"
+                  >Format: width:height (e.g., 16:9, 30:9)</small
+                >
+              </div>
+              <!-- <div style="display: flex; flex-direction: column; gap: 5px">
+                    <label style="font-size: 14px; color: #fff"
+                      >Winners Grid Width:</label
+                    >
+                    <div style="display: flex; align-items: center; gap: 8px">
+                      <input
+                        type="range"
+                        id="winnersGridWidth"
+                        min="70"
+                        max="100"
+                        value="95"
+                        style="flex: 1"
+                      />
+                      <span
+                        id="winnersGridWidthValue"
+                        style="min-width: 40px; font-size: 14px; color: #667eea"
+                        >95%</span
+                      >
+                    </div>
+                  </div> -->
+
+              <!-- <div style="display: flex; flex-direction: column; gap: 5px">
+                    <label style="font-size: 14px; color: #fff"
+                      >Card Gap:</label
+                    >
+                    <div style="display: flex; align-items: center; gap: 8px">
+                      <input
+                        type="range"
+                        id="cardGap"
+                        min="0.5"
+                        max="3"
+                        step="0.5"
+                        value="1.5"
+                        style="flex: 1"
+                      />
+                      <span
+                        id="cardGapValue"
+                        style="min-width: 40px; font-size: 14px; color: #667eea"
+                        >1.5%</span
+                      >
+                    </div>
+                  </div> -->
+            </div>
+          </div>
+          <div class="input-group" style="margin-top: 20px">
+            <a
+              href="display.html"
+              target="_blank"
+              class="btn btn-secondary"
+              id="openDisplayBtn"
+              style="
+                width: 100%;
+                margin-bottom: 10px;
+                text-align: center;
+                text-decoration: none;
+                display: inline-block;
+                pointer-events: none;
+                opacity: 0.5;
+              "
+            >
+              ⏳ Loading Icons...
+            </a>
+            <small style="color: #ffd700; font-weight: bold">📺 </small><br />
+            <small style="color: #888"></small>
+          </div>
+        </div>
+        <!-- end game settings -->
+
+        <!-- Result Panel Preview - Independent -->
+        <div class="result-panel" id="resultPanel" style="margin-top: 30px">
+          <h2 id="resultTitle">Results</h2>
+          <div id="resultMessage"></div>
+        </div>
+
+        <script>
+          // Update slider values display
+          document
+            .getElementById("winnersGridWidth")
+            .addEventListener("input", (e) => {
+              document.getElementById("winnersGridWidthValue").textContent =
+                e.target.value + "%";
+            });
+          document.getElementById("cardGap").addEventListener("input", (e) => {
+            document.getElementById("cardGapValue").textContent =
+              e.target.value + "%";
+          });
+
+          // Validate aspect ratio input format
+          function validateAspectRatioInput(input) {
+            const value = input.value.trim();
+            // Allow digits, colon, and spaces
+            const cleaned = value.replace(/[^0-9:]/g, "");
+            if (cleaned !== value) {
+              input.value = cleaned;
+            }
+
+            // Check if format is valid (e.g., "16:9", "30:9")
+            const match = cleaned.match(/^(\d+):(\d+)$/);
+            if (match) {
+              input.style.borderColor = "#667eea";
+              input.style.background = "rgba(0,0,0,0.3)";
+            } else if (cleaned.length > 0) {
+              input.style.borderColor = "#ff6b6b";
+              input.style.background = "rgba(255,107,107,0.1)";
+            } else {
+              input.style.borderColor = "#667eea";
+              input.style.background = "rgba(0,0,0,0.3)";
+            }
+          }
+        </script>
+
+        <!-- Race Info (for control window) -->
+        <div
+          class="race-info"
+          id="raceInfo"
+          style="margin-top: 20px; position: relative"
+        >
+          <div class="info-item">
+            <span class="label">Race:</span>
+            <span id="raceNumber" class="value">#1</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Time Left:</span>
+            <span id="timeLeft" class="value">30s</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Status:</span>
+            <span id="raceStatus" class="value">Waiting</span>
+          </div>
+        </div>
+
+        <!-- Control Panel (for control window) -->
+        <div
+          class="control-panel"
+          id="controlPanel"
+          style="
+            margin-top: 20px;
+            position: relative;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+          "
+        >
+          <button class="btn btn-small" onclick="game.goHome()" id="homeBtn">
+            🏠 Home
+          </button>
+          <button
+            class="btn btn-small"
+            onclick="game.controlStartRace()"
+            id="controlStartBtn"
+            disabled
+          >
+            Loading...
+          </button>
+          <button
+            class="btn btn-small"
+            onclick="game.pauseRace()"
+            id="pauseBtn"
+          >
+            ⏸ Pause
+          </button>
+          <button
+            class="btn btn-small"
+            onclick="game.resumeRace()"
+            id="resumeBtn"
+            disabled
+          >
+            ▶ Resume
+          </button>
+          <button
+            class="btn btn-primary"
+            onclick="game.continueRace()"
+            id="continueBtn"
+            style="display: none"
+          >
+            🎯 Next Race
+          </button>
+          <button
+            class="btn btn-secondary"
+            onclick="game.showWinnersPanel()"
+            id="viewResultsBtn"
+          >
+            📋 View Results
+          </button>
+        </div>
+        <!-- end control panel -->
+      </div>
+      <!-- end main container -->
+
+      <!-- Toast Notification Container -->
+      <div
+        id="toastContainer"
+        style="
+          position: fixed;
+          bottom: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 10000;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          pointer-events: none;
+        "
+      ></div>
+      <!-- end toast notification container -->
+
+      <!-- Victory Popup (outside container for max z-index) -->
+      <div class="victory-popup" id="victoryPopup">
+        <div class="victory-overlay" onclick="game.closeVictoryPopup()"></div>
+        <div class="victory-content">
+          <div class="victory-header">
+            <h1>🎉 VICTORY! 🎉</h1>
+          </div>
+          <div class="victory-body">
+            <div class="winner-icon" id="winnerIcon"></div>
+            <h2 class="winner-name" id="winnerName">Winner Name</h2>
+            <div class="winner-stats" id="winnerStats"></div>
+          </div>
+          <div class="victory-footer" style="display: none">
+            <button class="btn btn-primary" onclick="game.continueRace()">
+              🎯 Continue (Next Race)
+            </button>
+            <button
+              class="btn btn-secondary"
+              onclick="
+                game.closeVictoryPopup();
+                game.showWinnersPanel();
+              "
+            >
+              📋 View Results
+            </button>
+          </div>
         </div>
       </div>
-      <!-- end game settings -->
-
+      <!-- end victory popup -->
       <!-- Result Panel Settings - Collapsible -->
       <div class="result-panel-settings" style="margin-top: 30px">
         <div
@@ -415,7 +762,7 @@
               onclick="game.toggleResultPanelSettings()"
               style="background: #bde410; width: auto"
             >
-              ⚙️ Main Settings
+              ⚙️ Cài đặt hiển thị kết quả
             </button>
           </div>
 
@@ -432,15 +779,13 @@
               class="main-panel-prize-settings"
               style="font-size: 14px; color: #fff; margin-bottom: 10px"
             >
-              Prize Panel Settings
-
               <div class="input-group">
-                <label for="prizeTitleInput">Prize Title:</label>
+                <label for="prizeTitleInput">Tiêu đề giải thưởng:</label>
                 <input
                   type="text"
                   id="prizeTitleInput"
-                  placeholder="Prize Results"
-                  value="Prize Results"
+                  placeholder="Kết quả giải thưởng"
+                  value="Kết quả giải thưởng"
                   maxlength="50"
                   style="
                     padding: 8px;
@@ -456,10 +801,11 @@
                 >
               </div>
 
-              <!-- Race Prize Settings -->
+              <!-- Race Prize Settings: Hidden, using simplified version above -->
               <div
                 class="main-panel-prize-settings"
                 style="
+                  display: none;
                   margin-top: 15px;
                   padding: 10px;
                   background: rgba(255, 215, 0, 0.1);
@@ -470,6 +816,65 @@
                 <h4 style="color: #ffd700; font-size: 16px; margin: 0 0 10px 0">
                   🏁 Cài đặt Giải thưởng cho Cuộc đua (Race)
                 </h4>
+
+                <!-- Prize Group Input -->
+                <div
+                  style="
+                    background: rgba(0, 0, 0, 0.3);
+                    padding: 12px;
+                    border-radius: 5px;
+                    margin-bottom: 10px;
+                  "
+                >
+                  <div style="display: flex; gap: 8px; margin-bottom: 8px">
+                    <input
+                      type="text"
+                      id="prizeGroupName"
+                      placeholder="Tên giải (VD: Giải Khuyến Khích)"
+                      style="
+                        flex: 2;
+                        padding: 8px;
+                        background: #222;
+                        color: white;
+                        border: 1px solid #444;
+                        border-radius: 3px;
+                      "
+                    />
+                    <input
+                      type="number"
+                      id="prizeGroupCount"
+                      placeholder="Số người"
+                      min="1"
+                      value="1"
+                      style="
+                        flex: 1;
+                        padding: 8px;
+                        background: #222;
+                        color: white;
+                        border: 1px solid #444;
+                        border-radius: 3px;
+                        max-width: 100px;
+                      "
+                    />
+                    <button
+                      class="btn btn-small"
+                      onclick="game.addPrizeGroup()"
+                      style="
+                        background: #27ae60;
+                        padding: 8px 15px;
+                        font-size: 13px;
+                        white-space: nowrap;
+                      "
+                    >
+                      + Thêm nhóm giải
+                    </button>
+                  </div>
+                  <small style="color: #888; display: block">
+                    💡 VD: "Giải Khuyến Khích" + 30 người → tạo 30 giải cùng tên
+                  </small>
+                </div>
+
+                <!-- Prize List -->
                 <div
                   id="prizeNamesRaceContainer"
                   style="
@@ -485,14 +890,25 @@
                 <div style="margin-top: 10px; display: flex; gap: 5px">
                   <button
                     class="btn btn-small"
-                    onclick="game.addPrizeField('race')"
+                    onclick="game.clearAllPrizes()"
+                    style="
+                      background: #c0392b;
+                      padding: 5px 10px;
+                      font-size: 12px;
+                    "
+                  >
+                    🗑️ Xóa tất cả
+                  </button>
+                  <button
+                    class="btn btn-small"
+                    onclick="game.showRacePrizes()"
                     style="
                       background: #27ae60;
                       padding: 5px 10px;
                       font-size: 12px;
                     "
                   >
-                    + Thêm giải
+                    📋 Show Race Prizes
                   </button>
                   <button
                     class="btn btn-small"
@@ -506,6 +922,36 @@
                     ✓ Apply Race Prizes
                   </button>
                 </div>
+
+                <!-- Race Prizes Display (Toggle) -->
+                <div
+                  id="racePrizesDisplay"
+                  style="
+                    display: none;
+                    margin-top: 10px;
+                    padding: 10px;
+                    background: rgba(0, 0, 0, 0.4);
+                    border-radius: 5px;
+                    border: 1px solid #ffd700;
+                    max-height: 200px;
+                    overflow-y: auto;
+                  "
+                >
+                  <div
+                    style="
+                      color: #ffd700;
+                      font-weight: bold;
+                      margin-bottom: 5px;
+                    "
+                  >
+                    🏆 Race Prizes List:
+                  </div>
+                  <div
+                    id="racePrizesContent"
+                    style="color: #fff; font-size: 13px; line-height: 1.6"
+                  ></div>
+                </div>
+
                 <small style="color: #888; margin-top: 8px; display: block"
                   >* Giải thưởng này sẽ hiện trên Pop-up VICTORY ngay khi vịt
                   vừa chạm đích.</small
@@ -526,6 +972,64 @@
                 <h4 style="color: #667eea; font-size: 16px; margin: 0 0 10px 0">
                   📊 Gán Giải thưởng cho Kết quả (Result)
                 </h4>
+
+                <!-- Prize Group Input for Result -->
+                <div
+                  style="
+                    background: rgba(0, 0, 0, 0.3);
+                    padding: 12px;
+                    border-radius: 5px;
+                    margin-bottom: 10px;
+                  "
+                >
+                  <div style="display: flex; gap: 8px; margin-bottom: 8px">
+                    <input
+                      type="text"
+                      id="prizeResultGroupName"
+                      placeholder="Tên giải (VD: Giải Khuyến Khích)"
+                      style="
+                        flex: 2;
+                        padding: 8px;
+                        background: #222;
+                        color: white;
+                        border: 1px solid #444;
+                        border-radius: 3px;
+                      "
+                    />
+                    <input
+                      type="number"
+                      id="prizeResultGroupCount"
+                      placeholder="Số người"
+                      min="1"
+                      value="1"
+                      style="
+                        flex: 1;
+                        padding: 8px;
+                        background: #222;
+                        color: white;
+                        border: 1px solid #444;
+                        border-radius: 3px;
+                        max-width: 100px;
+                      "
+                    />
+                    <button
+                      class="btn btn-small"
+                      onclick="game.addPrizeResultGroup()"
+                      style="
+                        background: #8e44ad;
+                        padding: 8px 15px;
+                        font-size: 13px;
+                        white-space: nowrap;
+                      "
+                    >
+                      + Thêm nhóm giải
+                    </button>
+                  </div>
+                  <small style="color: #888; display: block">
+                    💡 Tạo nhiều hàng gán giải cùng tên một lúc
+                  </small>
+                </div>
+
                 <div
                   id="prizeAssignmentResultContainer"
                   style="
@@ -541,14 +1045,25 @@
                 <div style="margin-top: 10px; display: flex; gap: 5px">
                   <button
                     class="btn btn-small"
-                    onclick="game.addPrizeAssignmentField()"
+                    onclick="game.clearAllResultAssignments()"
                     style="
-                      background: #8e44ad;
+                      background: #c0392b;
                       padding: 5px 10px;
                       font-size: 12px;
                     "
                   >
-                    + Thêm hàng gán giải
+                    🗑️ Xóa tất cả
+                  </button>
+                  <button
+                    class="btn btn-small"
+                    onclick="game.showPrizeAssignments()"
+                    style="
+                      background: #27ae60;
+                      padding: 5px 10px;
+                      font-size: 12px;
+                    "
+                  >
+                    📋 Show Assignments
                   </button>
                   <button
                     class="btn btn-small"
@@ -562,6 +1077,36 @@
                     ✓ Apply & Show Results
                   </button>
                 </div>
+
+                <!-- Result Assignments Display (Toggle) -->
+                <div
+                  id="resultAssignmentsDisplay"
+                  style="
+                    display: none;
+                    margin-top: 10px;
+                    padding: 10px;
+                    background: rgba(0, 0, 0, 0.4);
+                    border-radius: 5px;
+                    border: 1px solid #667eea;
+                    max-height: 200px;
+                    overflow-y: auto;
+                  "
+                >
+                  <div
+                    style="
+                      color: #667eea;
+                      font-weight: bold;
+                      margin-bottom: 5px;
+                    "
+                  >
+                    🎁 Result Assignments:
+                  </div>
+                  <div
+                    id="resultAssignmentsContent"
+                    style="color: #fff; font-size: 13px; line-height: 1.6"
+                  ></div>
+                </div>
+
                 <small style="color: #888; margin-top: 8px; display: block"
                   >* Chọn người nhận giải từ danh sách "Victory History" đã
                   lưu.</small
@@ -569,326 +1114,65 @@
               </div>
             </div>
             <!-- Result Panel Background Settings -->
-            <div
-              class="main-panel-background-settings"
-              style="font-size: 14px; color: #fff; margin: 20px 0 10px 0"
-            >
-              Background Settings
-
-              <div class="input-group">
-                <label for="resultBgType">Background Type:</label>
-                <select
-                  id="resultBgType"
-                  onchange="game.toggleResultBackground()"
-                >
-                  <option value="default">Default</option>
-                  <option value="color">Solid Color</option>
-                  <option value="image">Custom Image</option>
-                </select>
-              </div>
-
-              <div
-                class="input-group"
-                id="resultBgColorGroup"
-                style="display: none"
+            <div class="input-group">
+              <label for="resultBgType">Background Type:</label>
+              <select
+                id="resultBgType"
+                onchange="game.toggleResultBackground()"
               >
-                <label for="resultBgColor">Background Color:</label>
-                <input type="color" id="resultBgColor" value="#1a1a2e" />
-              </div>
-
-              <div
-                class="input-group"
-                id="resultBgImageGroup"
-                style="display: none"
-              >
-                <label for="resultBgImage">Background Image:</label>
-                <input
-                  type="file"
-                  id="resultBgImage"
-                  accept="image/*"
-                  onchange="game.loadResultBackgroundImage(event)"
-                />
-                <small style="color: #888">Upload JPG, PNG, or GIF</small>
-              </div>
-
-              <div
-                style="
-                  margin-top: 15px;
-                  padding: 10px;
-                  background: rgba(102, 126, 234, 0.1);
-                  border-radius: 5px;
-                "
-              >
-                <h4 style="color: #667eea; font-size: 16px; margin: 0 0 10px 0">
-                  📐 Layout Settings
-                </h4>
-                <div
-                  style="
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 10px;
-                  "
-                >
-                  <div style="display: flex; flex-direction: column; gap: 5px">
-                    <label style="font-size: 14px; color: #fff"
-                      >Race Track Aspect Ratio:</label
-                    >
-                    <input
-                      type="text"
-                      id="raceTrackAspectRatio"
-                      value="20:5"
-                      placeholder="e.g., 16:9, 30:9, 21:9"
-                      style="
-                        padding: 8px;
-                        background: rgba(0, 0, 0, 0.3);
-                        border: 1px solid #667eea;
-                        border-radius: 5px;
-                        color: #fff;
-                        font-size: 14px;
-                      "
-                      oninput="validateAspectRatioInput(this)"
-                    />
-                    <small style="color: #888; font-size: 12px"
-                      >Format: width:height (e.g., 16:9, 30:9)</small
-                    >
-                  </div>
-                  <div style="display: flex; flex-direction: column; gap: 5px">
-                    <label style="font-size: 14px; color: #fff"
-                      >Winners Grid Width:</label
-                    >
-                    <div style="display: flex; align-items: center; gap: 8px">
-                      <input
-                        type="range"
-                        id="winnersGridWidth"
-                        min="70"
-                        max="100"
-                        value="95"
-                        style="flex: 1"
-                      />
-                      <span
-                        id="winnersGridWidthValue"
-                        style="min-width: 40px; font-size: 14px; color: #667eea"
-                        >95%</span
-                      >
-                    </div>
-                  </div>
-                  <div style="display: flex; flex-direction: column; gap: 5px">
-                    <label style="font-size: 14px; color: #fff"
-                      >Card Gap:</label
-                    >
-                    <div style="display: flex; align-items: center; gap: 8px">
-                      <input
-                        type="range"
-                        id="cardGap"
-                        min="0.5"
-                        max="3"
-                        step="0.5"
-                        value="1.5"
-                        style="flex: 1"
-                      />
-                      <span
-                        id="cardGapValue"
-                        style="min-width: 40px; font-size: 14px; color: #667eea"
-                        >1.5%</span
-                      >
-                    </div>
-                  </div>
-                </div>
-                <small style="color: #888; margin-top: 8px; display: block"
-                  >Adjust race track dimensions and winner card layout</small
-                >
-              </div>
-
-              <div class="input-group">
-                <button
-                  class="btn btn-small"
-                  onclick="game.applyResultPanelSettings()"
-                  style="background: #667eea; margin-right: 10px"
-                >
-                  ✓ Apply
-                </button>
-                <button
-                  class="btn btn-small"
-                  onclick="game.resetResultPanelSettings()"
-                  style="background: #888"
-                >
-                  ⟲ Reset
-                </button>
-              </div>
-              <!-- end layout settings -->
+                <option value="default">Default</option>
+                <option value="color">Solid Color</option>
+                <option value="image">Custom Image</option>
+              </select>
             </div>
+
+            <div
+              class="input-group"
+              id="resultBgColorGroup"
+              style="display: none"
+            >
+              <label for="resultBgColor">Background Color:</label>
+              <input type="color" id="resultBgColor" value="#1a1a2e" />
+            </div>
+
+            <div
+              class="input-group"
+              id="resultBgImageGroup"
+              style="display: none"
+            >
+              <label for="resultBgImage">Background Image:</label>
+              <input
+                type="file"
+                id="resultBgImage"
+                accept="image/*"
+                onchange="game.loadResultBackgroundImage(event)"
+              />
+              <small style="color: #888">Upload JPG, PNG, or GIF</small>
+            </div>
+            <div class="input-group">
+              <button
+                class="btn btn-small"
+                onclick="game.applyResultPanelSettings()"
+                style="background: #667eea; margin-right: 10px"
+              >
+                ✓ Apply
+              </button>
+              <button
+                class="btn btn-small"
+                onclick="game.resetResultPanelSettings()"
+                style="background: #888"
+              >
+                ⟲ Reset
+              </button>
+            </div>
+            <!-- end layout settings -->
           </div>
-          <!-- end main panel settings container -->
         </div>
-        <!-- end collapsible -->
+        <!-- end main panel settings container -->
       </div>
-      <!-- end main panel settings -->
-
-      <!-- Result Panel Preview - Independent -->
-      <div class="result-panel" id="resultPanel" style="margin-top: 30px">
-        <h2 id="resultTitle">Results</h2>
-        <div id="resultMessage"></div>
-      </div>
-
-      <script>
-        // Update slider values display
-        document
-          .getElementById("winnersGridWidth")
-          .addEventListener("input", (e) => {
-            document.getElementById("winnersGridWidthValue").textContent =
-              e.target.value + "%";
-          });
-        document.getElementById("cardGap").addEventListener("input", (e) => {
-          document.getElementById("cardGapValue").textContent =
-            e.target.value + "%";
-        });
-
-        // Validate aspect ratio input format
-        function validateAspectRatioInput(input) {
-          const value = input.value.trim();
-          // Allow digits, colon, and spaces
-          const cleaned = value.replace(/[^0-9:]/g, "");
-          if (cleaned !== value) {
-            input.value = cleaned;
-          }
-
-          // Check if format is valid (e.g., "16:9", "30:9")
-          const match = cleaned.match(/^(\d+):(\d+)$/);
-          if (match) {
-            input.style.borderColor = "#667eea";
-            input.style.background = "rgba(0,0,0,0.3)";
-          } else if (cleaned.length > 0) {
-            input.style.borderColor = "#ff6b6b";
-            input.style.background = "rgba(255,107,107,0.1)";
-          } else {
-            input.style.borderColor = "#667eea";
-            input.style.background = "rgba(0,0,0,0.3)";
-          }
-        }
-      </script>
-
-      <!-- Race Info (for control window) -->
-      <div
-        class="race-info"
-        id="raceInfo"
-        style="margin-top: 20px; position: relative"
-      >
-        <div class="info-item">
-          <span class="label">Race:</span>
-          <span id="raceNumber" class="value">#1</span>
-        </div>
-        <div class="info-item">
-          <span class="label">Time Left:</span>
-          <span id="timeLeft" class="value">30s</span>
-        </div>
-        <div class="info-item">
-          <span class="label">Status:</span>
-          <span id="raceStatus" class="value">Waiting</span>
-        </div>
-      </div>
-
-      <!-- Control Panel (for control window) -->
-      <div
-        class="control-panel"
-        id="controlPanel"
-        style="
-          margin-top: 20px;
-          position: relative;
-          display: flex;
-          gap: 10px;
-          justify-content: center;
-          flex-wrap: wrap;
-        "
-      >
-        <button class="btn btn-small" onclick="game.goHome()" id="homeBtn">
-          🏠 Home
-        </button>
-        <button
-          class="btn btn-small"
-          onclick="game.controlStartRace()"
-          id="controlStartBtn"
-          disabled
-        >
-          Loading...
-        </button>
-        <button class="btn btn-small" onclick="game.pauseRace()" id="pauseBtn">
-          ⏸ Pause
-        </button>
-        <button
-          class="btn btn-small"
-          onclick="game.resumeRace()"
-          id="resumeBtn"
-          disabled
-        >
-          ▶ Resume
-        </button>
-        <button
-          class="btn btn-primary"
-          onclick="game.continueRace()"
-          id="continueBtn"
-          style="display: none"
-        >
-          🎯 Next Race
-        </button>
-        <button
-          class="btn btn-secondary"
-          onclick="game.showWinnersPanel()"
-          id="viewResultsBtn"
-        >
-          📋 View Results
-        </button>
-      </div>
-      <!-- end control panel -->
+      <!-- end collapsible -->
     </div>
-    <!-- end main container -->
-
-    <!-- Toast Notification Container -->
-    <div
-      id="toastContainer"
-      style="
-        position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 10000;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        pointer-events: none;
-      "
-    ></div>
-    <!-- end toast notification container -->
-
-    <!-- Victory Popup (outside container for max z-index) -->
-    <div class="victory-popup" id="victoryPopup">
-      <div class="victory-overlay" onclick="game.closeVictoryPopup()"></div>
-      <div class="victory-content">
-        <div class="victory-header">
-          <h1>🎉 VICTORY! 🎉</h1>
-        </div>
-        <div class="victory-body">
-          <div class="winner-icon" id="winnerIcon"></div>
-          <h2 class="winner-name" id="winnerName">Winner Name</h2>
-          <div class="winner-stats" id="winnerStats"></div>
-        </div>
-        <div class="victory-footer" style="display: none">
-          <button class="btn btn-primary" onclick="game.continueRace()">
-            🎯 Continue (Next Race)
-          </button>
-          <button
-            class="btn btn-secondary"
-            onclick="
-              game.closeVictoryPopup();
-              game.showWinnersPanel();
-            "
-          >
-            📋 View Results
-          </button>
-        </div>
-      </div>
-    </div>
-    <!-- end victory popup -->
-
+    <!-- end main panel settings -->
     <!-- Top N Victory Popup -->
     <div class="victory-popup" id="topNVictoryPopup">
       <div class="victory-overlay" onclick="game.closeTopNVictoryPopup()"></div>
@@ -950,8 +1234,8 @@
     <!-- SheetJS library for Excel file support -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 
-    <script src="game.js?v=60"></script>
-    <script>
+    <script type="module" src="game.js?v=61"></script>
+    <script type="module">
       // Đăng nhập đơn giản: chỉ cần nhập username, lưu vào localStorage
       function showLogin() {
         document.getElementById("loginModal").style.display = "flex";
@@ -1273,6 +1557,13 @@
           };
         })(window.showMain);
       });
+
+      // Initialize simplified prize UI after game loads
+      setTimeout(() => {
+        if (window.game && game.renderSimplePrizeUI) {
+          game.renderSimplePrizeUI();
+        }
+      }, 500);
     </script>
   </body>
 </html>
