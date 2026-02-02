@@ -592,7 +592,7 @@
                 <!-- Ducks will be added here dynamically -->
             </div>
             <div class="bank-bot" id="bankBot"></div>
-            <div class="finish-line hidden" id="finishLine">FINISH</div>
+            <div class="finish-line hidden" id="finishLine"></div>
         </div>
         
         <!-- Result Panel (copy from index.html) -->
@@ -825,6 +825,9 @@
                     case 'RESET_RACE':
                         handleResetRace();
                         break;
+                    case 'RESET_HISTORY':
+                        handleResetHistory();
+                        break;
                     case 'SOUND_TOGGLE_CHANGED':
                         console.log('🔊 Sound toggle changed:', data.enabled);
                         if (displayGame && displayGame.soundManager) {
@@ -933,9 +936,9 @@
         }
         
         function startRaceWithData(data) {
-            const { duckCount, raceDuration, raceMode, winnerCount, gameSpeed, theme, duckNames, duckCodes, duckImages, startTime } = data;
+            const { duckCount, raceDuration, raceMode, winnerCount, gameSpeed, theme, duckNames, duckCodes, duckImages, startTime, usedPrizesCount, prizeRaceList } = data;
             
-            console.log('🎮 Display: startRaceWithData called with:', { duckCount, raceDuration, raceMode, winnerCount, gameSpeed, theme, duckNamesCount: duckNames?.length, duckCodesCount: duckCodes?.length });
+            console.log('🎮 Display: startRaceWithData called with:', { duckCount, raceDuration, raceMode, winnerCount, gameSpeed, theme, duckNamesCount: duckNames?.length, duckCodesCount: duckCodes?.length, usedPrizesCount, prizeRaceListCount: prizeRaceList?.length });
             
             // Verify displayGame exists
             if (!displayGame) {
@@ -950,13 +953,22 @@
             
             // Close victory popup if still open from previous race
             if (displayGame) {
-                displayGame.closeVictoryPopup();
+                displayGame.closeVictoryPopup && displayGame.closeVictoryPopup();
+                displayGame.closeTopNVictoryPopup && displayGame.closeTopNVictoryPopup();
+                
+                // Hide result panel from previous race
+                const resultPanel = document.getElementById('resultPanel');
+                if (resultPanel) {
+                    resultPanel.classList.add('hidden');
+                    resultPanel.style.display = 'none';
+                    console.log('Display: Result panel hidden');
+                }
                 
                 // CRITICAL: Reset timing variables to prevent timer continuation
                 displayGame.startTime = null;
                 displayGame.lastFrameTime = null;
                 
-                console.log('Display: Reset timing variables for new race');
+                console.log('Display: Reset timing variables and closed all popups for new race');
             }
             
             // CRITICAL: Hide loading display with style.display instead of class
@@ -996,6 +1008,13 @@
             displayGame.gameSpeed = gameSpeed || 1.0; // Set game speed from control
             displayGame.winners = []; // Reset winners array
             displayGame.currentTheme = theme;
+            
+            // CRITICAL: Force sync prize data from control (0 is a valid value!)
+            displayGame.usedPrizesCount = usedPrizesCount || 0;
+            displayGame.prizeRaceList = prizeRaceList || [];
+            
+            console.log('🎁 Display synced prize data - usedPrizesCount:', displayGame.usedPrizesCount, 'prizeList:', displayGame.prizeRaceList.slice(0, 5));
+            
             if (duckNames && duckNames.length > 0) {
                 displayGame.activeDuckNames = duckNames;
                 displayGame.duckNames = duckNames; // Also set duckNames for reference
@@ -1005,7 +1024,7 @@
                 displayGame.duckCodes = duckCodes; // Also set duckCodes for reference
             }
             
-            console.log('Display: Setting up race - Mode:', displayGame.raceMode, 'WinnerCount:', displayGame.winnerCount, 'Speed:', displayGame.gameSpeed + 'x', 'Ducks:', duckCount);
+            console.log('Display: Setting up race - Mode:', displayGame.raceMode, 'WinnerCount:', displayGame.winnerCount, 'Speed:', displayGame.gameSpeed + 'x', 'Ducks:', duckCount, 'UsedPrizes:', displayGame.usedPrizesCount);
             try {
                 displayGame.setupRace();
                 console.log('✅ Display: setupRace() completed successfully');
@@ -1158,6 +1177,36 @@
                 if (victoryPopup) victoryPopup.classList.add('hidden');
                 
                 console.log('✅ Display reset complete, ready for next race');
+            }
+        }
+        
+        function handleResetHistory() {
+            console.log('🗑️ RESET_HISTORY: Clearing all history on display');
+            if (displayGame) {
+                // Reset prize tracking counters
+                displayGame.usedPrizesCount = 0;
+                displayGame.winners = [];
+                displayGame.prizeResultAssignments = [];
+                
+                // Clear ALL localStorage keys
+                localStorage.setItem('usedPrizesCount', '0');
+                localStorage.removeItem('prizeResultAssignments');
+                localStorage.removeItem('duckRaceWinners');
+                localStorage.removeItem('prizeRaceList');
+                
+                // Close all popups
+                if (displayGame.closeVictoryPopup) displayGame.closeVictoryPopup();
+                if (displayGame.closeTopNVictoryPopup) displayGame.closeTopNVictoryPopup();
+                
+                // Hide result panel
+                const resultPanel = document.getElementById('resultPanel');
+                if (resultPanel) {
+                    resultPanel.classList.add('hidden');
+                    resultPanel.style.display = 'none';
+                }
+                
+                console.log('✅ History cleared - usedPrizesCount reset to:', displayGame.usedPrizesCount);
+                console.log('✅ localStorage cleared');
             }
         }
         

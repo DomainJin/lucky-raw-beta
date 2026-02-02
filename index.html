@@ -220,7 +220,7 @@
             onclick="
               if (window.game) {
                 var val = document.getElementById('duckSizeRatio').value;
-                game.setDuckSizeRatio(val);
+                game.setDuckSizeRatio(parseFloat(val));
                 game.forceUpdateDuckSize && game.forceUpdateDuckSize();
                 // Gửi sang display luôn, không cần kiểm tra displayReady
                 var ratio = parseFloat(val) / 100;
@@ -456,66 +456,115 @@
                 >
               </div>
 
+              <!-- Race Prize Settings -->
               <div
+                class="main-panel-prize-settings"
                 style="
                   margin-top: 15px;
                   padding: 10px;
-                  background: rgba(240, 147, 251, 0.1);
+                  background: rgba(255, 215, 0, 0.1);
+                  border: 1px solid #ffd700;
                   border-radius: 5px;
                 "
               >
+                <h4 style="color: #ffd700; font-size: 16px; margin: 0 0 10px 0">
+                  🏁 Cài đặt Giải thưởng cho Cuộc đua (Race)
+                </h4>
                 <div
-                  style="
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 10px;
-                  "
-                >
-                  <h4 style="color: #f093fb; font-size: 16px; margin: 0">
-                    🏆 Customize Prize Names
-                  </h4>
-                  <div style="display: flex; gap: 5px">
-                    <button
-                      onclick="game.sortPrizeNames('asc')"
-                      class="btn btn-secondary"
-                      style="padding: 5px 10px; font-size: 12px"
-                      title="Sort Prize 1, 2, 3..."
-                    >
-                      ↑ 1-N
-                    </button>
-                    <button
-                      onclick="game.sortPrizeNames('desc')"
-                      class="btn btn-secondary"
-                      style="padding: 5px 10px; font-size: 12px"
-                      title="Sort Prize N, N-1... 3, 2, 1"
-                    >
-                      ↓ N-1
-                    </button>
-                    <button
-                      onclick="game.addPrizeNameField()"
-                      class="btn btn-secondary"
-                      style="padding: 5px 10px; font-size: 12px"
-                    >
-                      + Add Prize
-                    </button>
-                  </div>
-                </div>
-                <div
-                  id="prizeNamesContainer"
+                  id="prizeNamesRaceContainer"
                   style="
                     display: flex;
                     flex-direction: column;
                     gap: 8px;
-                    max-height: 300px;
+                    max-height: 250px;
                     overflow-y: auto;
                   "
                 >
-                  <!-- Prize name fields will be dynamically added here -->
+                  <!-- Prize fields for race will be dynamically added here -->
+                </div>
+                <div style="margin-top: 10px; display: flex; gap: 5px">
+                  <button
+                    class="btn btn-small"
+                    onclick="game.addPrizeField('race')"
+                    style="
+                      background: #27ae60;
+                      padding: 5px 10px;
+                      font-size: 12px;
+                    "
+                  >
+                    + Thêm giải
+                  </button>
+                  <button
+                    class="btn btn-small"
+                    onclick="game.applyPrizeRace()"
+                    style="
+                      background: #2980b9;
+                      padding: 5px 10px;
+                      font-size: 12px;
+                    "
+                  >
+                    ✓ Apply Race Prizes
+                  </button>
                 </div>
                 <small style="color: #888; margin-top: 8px; display: block"
-                  >Leave blank to use default names (Prize 1, Prize 2,
-                  etc.)</small
+                  >* Giải thưởng này sẽ hiện trên Pop-up VICTORY ngay khi vịt
+                  vừa chạm đích.</small
+                >
+              </div>
+
+              <!-- Result Prize Assignment Settings -->
+              <div
+                class="main-panel-prize-settings"
+                style="
+                  margin-top: 15px;
+                  padding: 10px;
+                  background: rgba(102, 126, 234, 0.1);
+                  border: 1px solid #667eea;
+                  border-radius: 5px;
+                "
+              >
+                <h4 style="color: #667eea; font-size: 16px; margin: 0 0 10px 0">
+                  📊 Gán Giải thưởng cho Kết quả (Result)
+                </h4>
+                <div
+                  id="prizeAssignmentResultContainer"
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                    max-height: 250px;
+                    overflow-y: auto;
+                  "
+                >
+                  <!-- Prize assignment fields will be dynamically added here -->
+                </div>
+                <div style="margin-top: 10px; display: flex; gap: 5px">
+                  <button
+                    class="btn btn-small"
+                    onclick="game.addPrizeAssignmentField()"
+                    style="
+                      background: #8e44ad;
+                      padding: 5px 10px;
+                      font-size: 12px;
+                    "
+                  >
+                    + Thêm hàng gán giải
+                  </button>
+                  <button
+                    class="btn btn-small"
+                    onclick="game.applyPrizeResultAssignment()"
+                    style="
+                      background: #667eea;
+                      padding: 5px 10px;
+                      font-size: 12px;
+                    "
+                  >
+                    ✓ Apply & Show Results
+                  </button>
+                </div>
+                <small style="color: #888; margin-top: 8px; display: block"
+                  >* Chọn người nhận giải từ danh sách "Victory History" đã
+                  lưu.</small
                 >
               </div>
             </div>
@@ -1011,6 +1060,8 @@
         if (typeof game !== "undefined") {
           game.loadSavedData && game.loadSavedData();
           game.loadPrizeNames && game.loadPrizeNames();
+          game.renderPrizeRaceUI && game.renderPrizeRaceUI();
+          game.renderPrizeAssignmentUI && game.renderPrizeAssignmentUI();
           game.loadResultPanelSettings && game.loadResultPanelSettings();
         }
       }

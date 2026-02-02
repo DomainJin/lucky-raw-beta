@@ -1326,7 +1326,7 @@ h1 {
      by race-river or clipped by fixed pixel offsets on different viewports */
   top: 15%; /* match race-river top */
   height: 70%; /* span the race-river area vertically */
-  width: 60px; /* Tăng từ 20px lên 60px */
+  width: 20px; /* Tăng từ 20px lên 60px */
   background: repeating-linear-gradient(
     0deg,
     black 0px,

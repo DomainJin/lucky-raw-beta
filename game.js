@@ -672,18 +672,12 @@ console.log("Classes loaded successfully");
 
 // Game class with all features
 class Game {
-  // Tự động chuyển mode dựa vào số lượng winner
+  // Always use topN mode with configurable winner count
   handleWinnerCountChange(val) {
     const n = parseInt(val);
-    if (n === 1) {
-      this.raceMode = "normal";
-    } else if (n > 1) {
-      this.raceMode = "topN";
-    }
+    this.raceMode = "topN"; // Always use topN mode
     this.winnerCount = n;
-    // Ẩn/hiện group nếu cần, nhưng hiện tại luôn hiện input
-    // Có thể cập nhật UI khác nếu muốn
-    console.log("[AutoMode] Winner count:", n, "-> mode:", this.raceMode);
+    console.log("[TopN Mode] Winner count:", n);
   }
   // Force update all duck sizes (live update)
   forceUpdateDuckSize() {
@@ -707,10 +701,21 @@ class Game {
     this.duckCount = 300;
     this.raceDuration = 30;
     this.gameSpeed = 1.0; // Game speed multiplier: 0.25x to 3x
-    this.raceMode = "normal"; // 'normal' or 'topN'
+    this.raceMode = "topN"; // Always use topN mode with variable winner count
     this.winnerCount = 3; // For topN mode
     this.winners = []; // Array to store accumulated winners across races
     this.currentRaceWinners = []; // Array to store winners for current race only (topN mode)
+
+    // Prize management - separate for race and result
+    this.prizeRaceList = JSON.parse(localStorage.getItem("prizeRaceList")) || [
+      "Giải Nhất",
+      "Giải Nhì",
+      "Giải Ba",
+    ];
+    this.prizeResultAssignments =
+      JSON.parse(localStorage.getItem("prizeResultAssignments")) || [];
+    this.usedPrizesCount =
+      parseInt(localStorage.getItem("usedPrizesCount")) || 0; // Track số giải đã trao
 
     this.trackContainer = null;
     this.duckElements = new Map();
@@ -963,6 +968,10 @@ class Game {
         // Display has detected winner and sent it back
         console.log("✅ Received DISPLAY_RACE_FINISHED from display");
         this.handleDisplayRaceFinished(data);
+      } else if (type === "SHOW_RESULTS_ASSIGNED") {
+        // Display custom assigned results on display screen
+        console.log("✅ Received SHOW_RESULTS_ASSIGNED for display");
+        this.displayCustomAssignedResults(data);
       }
     };
 
@@ -1324,6 +1333,204 @@ class Game {
     if (container) {
       container.classList.toggle("hidden");
     }
+  }
+
+  // --- RACE PRIZE MANAGEMENT ---
+  addPrizeField(type) {
+    if (type === "race") {
+      this.prizeRaceList.push(`Giải mới ${this.prizeRaceList.length + 1}`);
+      this.renderPrizeRaceUI();
+    }
+  }
+
+  renderPrizeRaceUI() {
+    const container = document.getElementById("prizeNamesRaceContainer");
+    if (!container) return;
+
+    container.innerHTML = this.prizeRaceList
+      .map((prize, index) => {
+        const isUsed = index < this.usedPrizesCount;
+        const opacity = isUsed ? "0.5" : "1";
+        const disabled = isUsed ? "disabled" : "";
+        const cursor = isUsed ? "not-allowed" : "pointer";
+        const bgColor = isUsed ? "#1a1a1a" : "#222";
+
+        return `
+        <div style="display: flex; gap: 5px; align-items: center; opacity: ${opacity};">
+            <label style="min-width: 60px; color: ${isUsed ? "#666" : "#ffd700"}; font-weight: bold;">Prize ${index + 1}:</label>
+            <input type="text" value="${prize}" onchange="game.updatePrizeRaceName(${index}, this.value)" 
+                   ${disabled}
+                   style="flex: 1; padding: 5px; background: ${bgColor}; color: white; border: 1px solid #444; border-radius: 3px; cursor: ${isUsed ? "not-allowed" : "text"};">
+            <button onclick="game.removePrizeRace(${index});" 
+                    ${disabled}
+                    style="background:#c0392b; color:white; border:none; padding: 0 10px; border-radius: 3px; cursor: ${cursor}; opacity: ${isUsed ? "0.5" : "1"};">X</button>
+            ${isUsed ? '<span style="color: #27ae60; font-size: 12px; min-width: 80px;">✓ Đã trao</span>' : ""}
+        </div>
+    `;
+      })
+      .join("");
+  }
+
+  updatePrizeRaceName(index, value) {
+    this.prizeRaceList[index] = value;
+    localStorage.setItem("prizeRaceList", JSON.stringify(this.prizeRaceList));
+    console.log(`✓ Updated prize ${index + 1}: "${value}"`);
+  }
+
+  removePrizeRace(index) {
+    if (this.prizeRaceList.length <= 1) {
+      alert("Phải giữ ít nhất 1 giải thưởng!");
+      return;
+    }
+    if (index < this.usedPrizesCount) {
+      alert("Không thể xóa giải đã trao! Vui lòng reset history trước.");
+      return;
+    }
+    this.prizeRaceList.splice(index, 1);
+    this.renderPrizeRaceUI();
+  }
+
+  applyPrizeRace() {
+    localStorage.setItem("prizeRaceList", JSON.stringify(this.prizeRaceList));
+    alert("✓ Đã áp dụng danh sách giải thưởng cho cuộc đua!");
+    console.log("✓ Prize race list saved:", this.prizeRaceList);
+  }
+
+  // --- RESULT PRIZE ASSIGNMENT (CUSTOM WINNER SELECTION) ---
+  addPrizeAssignmentField() {
+    this.prizeResultAssignments.push({ prizeName: "Tên giải", winnerId: "" });
+    this.renderPrizeAssignmentUI();
+  }
+
+  renderPrizeAssignmentUI() {
+    const container = document.getElementById("prizeAssignmentResultContainer");
+    if (!container) return;
+
+    // Lấy danh sách người thắng từ this.winners
+    const winnerOptions = this.winners
+      .map(
+        (w) =>
+          `<option value="${w.id}">${w.code ? w.code + " - " : ""}${w.name}</option>`,
+      )
+      .join("");
+
+    container.innerHTML = this.prizeResultAssignments
+      .map(
+        (assign, index) => `
+        <div style="display: flex; gap: 10px; align-items: center; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 5px;">
+            <input type="text" placeholder="Tên giải" value="${assign.prizeName}" 
+                   onchange="game.prizeResultAssignments[${index}].prizeName = this.value"
+                   style="flex: 1; padding: 5px; background: #111; color: #ffd700; border: 1px solid #333; border-radius: 3px;">
+            <span style="color: white;">➜</span>
+            <select onchange="game.prizeResultAssignments[${index}].winnerId = this.value"
+                    style="flex: 1; padding: 5px; background: #111; color: white; border: 1px solid #333; border-radius: 3px;">
+                <option value="">-- Chọn người nhận --</option>
+                ${winnerOptions}
+            </select>
+            <button onclick="game.removePrizeAssignment(${index});" 
+                    style="background: #c0392b; border: none; color: white; padding: 5px 10px; border-radius: 3px; cursor: pointer;">X</button>
+        </div>
+    `,
+      )
+      .join("");
+
+    // Set lại giá trị đã chọn cho các select sau khi render
+    this.prizeResultAssignments.forEach((assign, index) => {
+      const selects = container.querySelectorAll("select");
+      if (selects[index]) selects[index].value = assign.winnerId;
+    });
+  }
+
+  removePrizeAssignment(index) {
+    this.prizeResultAssignments.splice(index, 1);
+    this.renderPrizeAssignmentUI();
+  }
+
+  applyPrizeResultAssignment() {
+    localStorage.setItem(
+      "prizeResultAssignments",
+      JSON.stringify(this.prizeResultAssignments),
+    );
+
+    // Hiển thị Result Panel dựa trên dữ liệu đã gán
+    this.showFinalAssignedResults();
+  }
+
+  showFinalAssignedResults() {
+    const resultPanel = document.getElementById("resultPanel");
+    const resultMessage = document.getElementById("resultMessage");
+    if (!resultPanel || !resultMessage) return;
+
+    resultPanel.classList.remove("hidden");
+
+    let html = `<div class="winners-grid" style="width: 95%; gap: 1.5%;">`;
+
+    this.prizeResultAssignments.forEach((assign, index) => {
+      // Tìm thông tin người thắng dựa trên winnerId đã chọn
+      const winnerInfo = this.winners.find((w) => w.id == assign.winnerId);
+      const displayName = winnerInfo ? winnerInfo.name : "---";
+      const displayCode = winnerInfo && winnerInfo.code ? winnerInfo.code : "";
+
+      html += `
+            <div class="winner-card">
+                <div class="winner-medal">${index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🏅"}</div>
+                <div class="winner-position">${assign.prizeName}</div>
+                <div class="winner-duck-name">${displayCode} ${displayName}</div>
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+    resultMessage.innerHTML = html;
+
+    // Gửi sang màn hình Display
+    if (this.displayChannel) {
+      this.displayChannel.postMessage({
+        type: "SHOW_RESULTS_ASSIGNED",
+        data: {
+          assignments: this.prizeResultAssignments,
+          winners: this.winners,
+        },
+      });
+    }
+
+    alert("✓ Đã cập nhật bảng giải thưởng kết quả!");
+    console.log("✓ Result assignments applied:", this.prizeResultAssignments);
+  }
+
+  displayCustomAssignedResults(data) {
+    // This function runs on display.html to show custom assigned results
+    if (!this.isDisplayMode) return; // Only run on display
+
+    const resultPanel = document.getElementById("resultPanel");
+    const resultMessage = document.getElementById("resultMessage");
+    if (!resultPanel || !resultMessage) return;
+
+    resultPanel.classList.remove("hidden");
+
+    const assignments = data.assignments || [];
+    const winners = data.winners || [];
+
+    let html = `<div class="winners-grid" style="width: 95%; gap: 1.5%;">`;
+
+    assignments.forEach((assign, index) => {
+      // Find winner info by winnerId
+      const winnerInfo = winners.find((w) => w.id == assign.winnerId);
+      const displayName = winnerInfo ? winnerInfo.name : "---";
+      const displayCode = winnerInfo && winnerInfo.code ? winnerInfo.code : "";
+
+      html += `
+            <div class="winner-card">
+                <div class="winner-medal">${index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🏅"}</div>
+                <div class="winner-position">${assign.prizeName}</div>
+                <div class="winner-duck-name">${displayCode} ${displayName}</div>
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+    resultMessage.innerHTML = html;
+    console.log("✓ Display showing custom assigned results");
   }
 
   applyRaceTrackAspectRatio(width, height) {
@@ -1763,7 +1970,8 @@ class Game {
       }
       const duckSizeEl = document.getElementById("duckSizeRatio");
       if (duckSizeEl) {
-        duckSizeEl.value = this.duckSizeRatio;
+        // Slider expects 10-100 (percent). Convert internal 0.1-1.0 -> 10-100
+        duckSizeEl.value = Math.round(this.duckSizeRatio * 100);
       }
       const duckSizeValue = document.getElementById("duckSizeValue");
       if (duckSizeValue)
@@ -2491,11 +2699,8 @@ class Game {
     const winnerCountEl = document.getElementById("winnerCount");
     if (winnerCountEl) {
       const n = parseInt(winnerCountEl.value);
-      if (n === 1) {
-        this.raceMode = "normal";
-      } else if (n > 1) {
-        this.raceMode = "topN";
-      }
+      // Always use topN mode regardless of count
+      this.raceMode = "topN";
       this.winnerCount = n;
     }
 
@@ -2594,6 +2799,8 @@ class Game {
         duckNames: [...this.activeDuckNames], // Clone array
         duckCodes: [...this.activeDuckCodes], // Send employee codes
         startTime: this.startTime, // Send synchronized start time
+        usedPrizesCount: this.usedPrizesCount, // Send prize counter
+        prizeRaceList: [...this.prizeRaceList], // Send prize list
       };
 
       console.log("Race data to send:", raceData);
@@ -2627,11 +2834,8 @@ class Game {
       // Lấy mode từ winnerCount
       if (winnerCountEl) {
         const n = parseInt(winnerCountEl.value);
-        if (n === 1) {
-          this.raceMode = "normal";
-        } else if (n > 1) {
-          this.raceMode = "topN";
-        }
+        // Always use topN mode
+        this.raceMode = "topN";
         this.winnerCount = n;
       }
 
@@ -2685,12 +2889,12 @@ class Game {
     }
 
     // Load persistent winners from localStorage to preserve across races
-    // For Top N mode: Reset winners array at start of new race to collect NEW winners
-    // For Normal mode: Keep accumulated winners from previous races
+    // Reset currentRaceWinners for BOTH modes to avoid showing old winners
+    this.currentRaceWinners = []; // Always reset for new race
+
     const savedWinners = this.loadWinners();
     if (this.raceMode === "topN") {
       // Top N mode: Start fresh for this race, but keep history for display
-      this.currentRaceWinners = []; // Track winners for current race only
       this.winners = savedWinners || []; // Keep historical winners
       console.log(
         `Top N mode: Starting fresh race. Historical winners: ${this.winners.length}`,
@@ -3506,29 +3710,21 @@ class Game {
       });
 
       // Send different messages for normal vs Top N mode
-      if (raceMode === "topN") {
-        // Top N mode: Send winner list to display
-        setTimeout(() => {
-          this.displayChannel.postMessage({
-            type: "SHOW_TOPN_WINNER",
-            data: {
-              winners: this.currentRaceWinners,
-              finishTime: parseFloat(finishTime),
-            },
-          });
-        }, 3000); // 3 second delay to see racers finish clearly
-      } else {
-        // Normal mode: Send single winner
-        setTimeout(() => {
-          this.displayChannel.postMessage({
-            type: "SHOW_WINNER",
-            data: {
-              winner,
-              finishTime: parseFloat(finishTime),
-            },
-          });
-        }, 3000); // 3 second delay to see racer finish clearly
-      }
+      // Both modes now use SHOW_TOPN_WINNER for consistency
+      setTimeout(() => {
+        this.displayChannel.postMessage({
+          type: "SHOW_TOPN_WINNER",
+          data: {
+            winners: this.currentRaceWinners, // Array of winners (1 or more)
+            finishTime: parseFloat(finishTime),
+          },
+        });
+        console.log(
+          "Control: Sent SHOW_TOPN_WINNER to display with",
+          this.currentRaceWinners.length,
+          "winner(s)",
+        );
+      }, 3000); // 3 second delay to see racers finish clearly
     }
 
     // Show/hide continue buttons based on mode
@@ -3575,50 +3771,18 @@ class Game {
         this.saveWinners();
         this.updateHistoryWin();
 
-        // Show Top N victory popup after delay
-        setTimeout(() => {
-          this.showTopNVictoryPopup();
-        }, 3000); // 3 second delay to see racers finish clearly
+        // Update prize assignment UI with new winners
+        if (this.renderPrizeAssignmentUI) {
+          this.renderPrizeAssignmentUI();
+        }
+
+        // Show Top N victory popup after delay (ONLY on control, not display)
+        if (!this.isDisplayMode) {
+          setTimeout(() => {
+            this.showTopNVictoryPopup();
+          }, 3000); // 3 second delay to see racers finish clearly
+        }
       }
-    } else {
-      // Normal mode: Save single winner
-      const startPosition = this.winners.length;
-      winner._controlFinishTime = parseFloat(finishTime);
-      winner.position = startPosition + 1;
-      winner.raceNumber = this.currentRaceNumber;
-      winner.prizePosition = winner.position; // Gán đúng thứ tự về đích
-      // Add winner to accumulated winners
-      this.winners.push({
-        position: winner.position,
-        id: winner.id,
-        name: winner.name,
-        code: winner.code, // Include employee code
-        iconSrc: winner.iconSrc,
-        finishTime: winner.finishTime,
-        _controlFinishTime: winner._controlFinishTime,
-        raceNumber: winner.raceNumber,
-        prizePosition: winner.position, // Gán đúng thứ tự về đích
-      });
-
-      console.log(
-        `Control: Normal mode - Added 1 winner. Total winners: ${this.winners.length}`,
-      );
-
-      // Remove winner from activeDuckNames for next race
-      this.activeDuckNames = this.activeDuckNames.filter(
-        (name) => name !== winner.name,
-      );
-
-      // Save accumulated winners to localStorage
-      this.saveWinners();
-      this.updateHistoryWin();
-
-      // Show victory popup after delay
-      setTimeout(() => {
-        // Dùng chung popup Top N cho cả 1 winner
-        this.currentRaceWinners = [winner];
-        this.showTopNVictoryPopup();
-      }, 3000); // 3 second delay to see racer finish clearly
     }
 
     // Update stats
@@ -3631,14 +3795,12 @@ class Game {
     // Update race history
     this.raceHistory.push({
       raceNumber: this.currentRaceNumber,
-      mode: raceMode || "normal",
+      mode: "topN",
       winners:
-        raceMode === "topN" &&
-        this.currentRaceWinners &&
-        this.currentRaceWinners.length > 0
+        this.currentRaceWinners && this.currentRaceWinners.length > 0
           ? this.currentRaceWinners.map((w) => ({ id: w.id, name: w.name }))
-          : [{ id: winner.id, name: winner.name }],
-      winnerCount: this.currentRaceWinners ? this.currentRaceWinners.length : 1,
+          : [],
+      winnerCount: this.currentRaceWinners ? this.currentRaceWinners.length : 0,
       duckCount: this.duckCount,
       duration: this.raceDuration,
       timestamp: new Date().toLocaleString("vi-VN"),
@@ -5069,114 +5231,72 @@ class Game {
     // Calculate finish time here to ensure consistency - use real time
     const finishTime = ((Date.now() - this.startTime) / 1000).toFixed(2);
 
-    // Send finish message to display window
+    // Send finish message to display window (if display tab is open)
+    // Display will handle race finish and send DISPLAY_RACE_FINISHED back to control
+    // Control should wait for that message instead of processing winners here
     if (this.displayChannel && !this.isDisplayMode) {
       this.displayChannel.postMessage({
         type: "RACE_FINISHED",
         data: { winner },
       });
 
-      // Show winner on display ONLY for normal mode (not Top N)
-      // Delay to allow player to see duck crossing finish line
-      if (this.raceMode !== "topN") {
-        setTimeout(() => {
-          this.displayChannel.postMessage({
-            type: "SHOW_WINNER",
-            data: {
-              winner,
-              finishTime: parseFloat(finishTime),
-            },
-          });
-        }, 1500); // 1.5 second delay to see finish
-      }
+      // IMPORTANT: Return here! Let display handle race finish and send message back
+      // Winners will be processed in handleDisplayRaceFinished() to avoid duplicate
+      console.log(
+        "Control: Sent RACE_FINISHED to display, waiting for DISPLAY_RACE_FINISHED message",
+      );
+      return;
     }
 
-    // Show continue button in control panel (only if elements exist)
-    // For Top N mode: hide continue buttons since we only run once
-    if (this.raceMode === "topN") {
-      safeElementAction("continueBtn", (el) => (el.style.display = "none"));
-      safeElementAction("continueBankBtn", (el) => el.classList.add("hidden"));
-    } else {
-      safeElementAction(
-        "continueBtn",
-        (el) => (el.style.display = "inline-block"),
-      );
-      safeElementAction("continueBankBtn", (el) =>
-        el.classList.remove("hidden"),
-      );
-    }
+    // Below code ONLY runs when control is standalone (no display tab)
+    console.log(
+      "Control: Running standalone mode (no display), processing winners locally",
+    );
+
+    // Show continue button in control panel (always hidden in topN mode)
+    safeElementAction("continueBtn", (el) => (el.style.display = "none"));
+    safeElementAction("continueBankBtn", (el) => el.classList.add("hidden"));
     safeElementAction("pauseBtn", (el) => (el.disabled = true));
 
-    // Save winners to history and exclude them from next race
-    if (this.raceMode === "topN") {
-      // Top N mode: Merge current race winners into historical winners
-      if (this.currentRaceWinners && this.currentRaceWinners.length > 0) {
-        const startPosition = this.winners.length; // Continue numbering from last position
+    // Save winners to history and exclude them from next race (always topN mode)
+    // Merge current race winners into historical winners
+    if (this.currentRaceWinners && this.currentRaceWinners.length > 0) {
+      const startPosition = this.winners.length; // Continue numbering from last position
 
-        this.currentRaceWinners.forEach((w, index) => {
-          w._controlFinishTime = parseFloat(finishTime);
-          w.position = startPosition + index + 1; // Continue position numbering
-          w.raceNumber = this.currentRaceNumber;
+      this.currentRaceWinners.forEach((w, index) => {
+        w._controlFinishTime = parseFloat(finishTime);
+        w.position = startPosition + index + 1; // Continue position numbering
+        w.raceNumber = this.currentRaceNumber;
 
-          // Add to accumulated winners
-          this.winners.push(w);
-        });
-
-        console.log(
-          `Top N mode: Added ${this.currentRaceWinners.length} new winners. Total winners: ${this.winners.length}`,
-        );
-
-        // Remove winners from activeDuckNames for next race
-        const winnerNames = this.currentRaceWinners.map((w) => w.name);
-        this.activeDuckNames = this.activeDuckNames.filter(
-          (name) => !winnerNames.includes(name),
-        );
-
-        // Save accumulated winners to localStorage
-        this.saveWinners();
-        this.updateHistoryWin();
-
-        // Show Top N victory popup after delay (like normal mode)
-        setTimeout(() => {
-          this.showTopNVictoryPopup();
-        }, 3000); // 3 second delay to see racers finish clearly
-      }
-    } else {
-      // Normal mode: Save single winner immediately and show popup
-      const startPosition = this.winners.length;
-      winner._controlFinishTime = parseFloat(finishTime);
-      winner.position = startPosition + 1;
-      winner.raceNumber = this.currentRaceNumber;
-
-      // Add winner to accumulated winners
-      this.winners.push({
-        position: winner.position,
-        id: winner.id,
-        name: winner.name,
-        code: winner.code, // Include employee code
-        iconSrc: winner.iconSrc,
-        finishTime: winner.finishTime,
-        _controlFinishTime: winner._controlFinishTime,
-        raceNumber: winner.raceNumber,
+        // Add to accumulated winners
+        this.winners.push(w);
       });
 
       console.log(
-        `Normal mode: Added 1 winner. Total winners: ${this.winners.length}`,
+        `Top N mode: Added ${this.currentRaceWinners.length} new winners. Total winners: ${this.winners.length}`,
       );
 
-      // Remove winner from activeDuckNames for next race
+      // Remove winners from activeDuckNames for next race
+      const winnerNames = this.currentRaceWinners.map((w) => w.name);
       this.activeDuckNames = this.activeDuckNames.filter(
-        (name) => name !== winner.name,
+        (name) => !winnerNames.includes(name),
       );
 
       // Save accumulated winners to localStorage
       this.saveWinners();
       this.updateHistoryWin();
 
-      // Show victory popup after delay
-      setTimeout(() => {
-        this.showVictoryPopup(winner);
-      }, 3000); // 3 second delay to see racer finish clearly
+      // Update prize assignment UI with new winners
+      if (this.renderPrizeAssignmentUI) {
+        this.renderPrizeAssignmentUI();
+      }
+
+      // Show Top N victory popup after delay (ONLY on control, not display)
+      if (!this.isDisplayMode) {
+        setTimeout(() => {
+          this.showTopNVictoryPopup();
+        }, 3000); // 3 second delay to see racers finish clearly
+      }
     }
 
     this.stats.totalRaces++;
@@ -5188,12 +5308,9 @@ class Game {
 
     this.raceHistory.push({
       raceNumber: this.currentRaceNumber,
-      mode: this.raceMode || "normal",
-      winners:
-        this.raceMode === "topN" && this.winners.length > 0
-          ? this.winners.map((w) => ({ id: w.id, name: w.name }))
-          : [{ id: winner.id, name: winner.name }],
-      winnerCount: this.winners.length || 1,
+      mode: "topN",
+      winners: this.currentRaceWinners.map((w) => ({ id: w.id, name: w.name })),
+      winnerCount: this.winnerCount,
       duckCount: this.duckCount,
       duration: this.raceDuration,
       timestamp: new Date().toLocaleString("vi-VN"),
@@ -5209,7 +5326,7 @@ class Game {
     safeElementAction(
       "resultTitle",
       (el) =>
-        (el.innerHTML = `🏆 Race Finished! <span style="font-size:0.6em;color:#888;">(${this.raceMode === "topN" ? "Top " + this.winnerCount : "Normal"})</span>`),
+        (el.innerHTML = `🏆 Race Finished! <span style="font-size:0.6em;color:#888;">(Top ${this.winnerCount})</span>`),
     );
 
     let resultHTML = `
@@ -5377,17 +5494,23 @@ class Game {
     // Build winners grid - show only current race winners
     let winnersHTML = "";
     winnersToShow.forEach((winner, index) => {
-      // Vị trí giải thưởng thực tế lấy từ winner.prizePosition
-      const prizePosition = winner.prizePosition || index + 1;
+      // Lấy giải theo thứ tự index từ usedPrizesCount
+      const prizeIndex = this.usedPrizesCount + index;
       const medal =
-        prizePosition === 1
-          ? "🥇"
-          : prizePosition === 2
-            ? "🥈"
-            : prizePosition === 3
-              ? "🥉"
-              : "🏅";
-      const prizeName = this.getPrizeName(prizePosition);
+        index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🏅";
+
+      // Use prizeRaceList với index tự động tăng
+      let prizeName = this.prizeRaceList[prizeIndex];
+
+      // Fallback if prize name is empty, just a number, or undefined
+      if (!prizeName || prizeName.trim() === "" || !isNaN(prizeName)) {
+        prizeName = `Giải ${prizeIndex + 1}`;
+      }
+
+      console.log(
+        `Winner ${index}: usedPrizesCount=${this.usedPrizesCount}, prizeIndex=${prizeIndex}, prizeName="${prizeName}", prizeRaceList=`,
+        this.prizeRaceList,
+      );
 
       // Create winner icon
       let iconHTML = "";
@@ -5416,6 +5539,22 @@ class Game {
     setTimeout(() => {
       popup.classList.add("show");
     }, 10);
+
+    // ONLY control mode should update usedPrizesCount (display just shows popup)
+    if (!this.isDisplayMode) {
+      this.usedPrizesCount += winnersToShow.length;
+      localStorage.setItem("usedPrizesCount", this.usedPrizesCount.toString());
+      console.log(`✓ Updated usedPrizesCount: ${this.usedPrizesCount}`);
+
+      // Re-render prize UI to disable used prizes
+      if (this.renderPrizeRaceUI) {
+        this.renderPrizeRaceUI();
+      }
+    } else {
+      console.log(
+        `📺 Display showing popup (usedPrizesCount NOT changed): ${this.usedPrizesCount}`,
+      );
+    }
   }
 
   closeTopNVictoryPopup() {
@@ -5725,23 +5864,58 @@ class Game {
     ) {
       this.winners = [];
       this.activeDuckNames = [...this.duckNames];
-      this.saveWinners();
+      this.usedPrizesCount = 0; // Reset prize counter
+
+      // Clear all prize-related localStorage
+      localStorage.setItem("usedPrizesCount", "0"); // Force set to 0
+      localStorage.removeItem("prizeResultAssignments");
+      localStorage.removeItem("duckRaceWinners");
+
+      this.saveWinners(); // Save empty winners array
+      this.prizeResultAssignments = []; // Reset result assignments
+
+      // Send reset message to display
+      if (this.displayChannel && !this.isDisplayMode) {
+        this.displayChannel.postMessage({
+          type: "RESET_HISTORY",
+          data: {},
+        });
+        console.log("📤 Sent RESET_HISTORY to display");
+      }
+
       // Đóng popup victory nếu còn hiển thị
       this.closeVictoryPopup && this.closeVictoryPopup();
       this.closeTopNVictoryPopup && this.closeTopNVictoryPopup();
+
+      // Re-render prize UI immediately before reload
+      if (this.renderPrizeRaceUI) {
+        this.renderPrizeRaceUI();
+      }
+      if (this.renderPrizeAssignmentUI) {
+        this.renderPrizeAssignmentUI();
+      }
+
+      console.log(
+        "✓ Reset complete: usedPrizesCount set to 0, reloading page...",
+      );
+
       // Reload page to refresh interface
-      location.reload();
+      setTimeout(() => location.reload(), 100);
     }
   }
 
   fullReset() {
     // Reset hoàn toàn bao gồm cả winners
     localStorage.clear(); // Xóa toàn bộ localStorage khi restart
+
+    // Reset all variables
     this.winners = [];
     this.excludedDucks = [];
     this.activeDuckNames = [...this.duckNames]; // Reset về danh sách ban đầu
     this.activeDuckCodes = [...this.duckCodes]; // Reset codes as well
-    this.saveWinners();
+    this.usedPrizesCount = 0; // Reset prize counter
+    this.prizeResultAssignments = []; // Reset result assignments
+    this.prizeRaceList = ["Giải Nhất", "Giải Nhì", "Giải Ba"]; // Reset to default
 
     // Đóng popup victory nếu còn hiển thị
     this.closeVictoryPopup && this.closeVictoryPopup();
