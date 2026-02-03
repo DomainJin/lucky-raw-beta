@@ -2228,6 +2228,18 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     html += `</div>`;
     resultMessage.innerHTML = html;
 
+    // Get prize title from input or current script
+    const prizeTitleInput = document.getElementById("prizeTitleInput");
+    const prizeTitle = prizeTitleInput
+      ? prizeTitleInput.value.trim()
+      : this.currentScriptPrizeName || "Kết quả";
+
+    // Update result title
+    const resultTitle = document.getElementById("resultTitle");
+    if (resultTitle) {
+      resultTitle.innerHTML = `🏆 ${prizeTitle}`;
+    }
+
     // Gửi sang màn hình Display
     if (this.displayChannel) {
       this.displayChannel.postMessage({
@@ -2235,6 +2247,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         data: {
           assignments: this.prizeResultAssignments,
           winners: this.winners,
+          prizeTitle: prizeTitle,
         },
       });
     }

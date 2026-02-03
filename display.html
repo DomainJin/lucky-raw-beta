@@ -924,6 +924,10 @@
             case "SHOW_RESULTS":
               handleShowResults(data);
               break;
+            case "SHOW_RESULTS_ASSIGNED":
+              console.log("🎁 SHOW_RESULTS_ASSIGNED received:", data);
+              handleShowResultsAssigned(data);
+              break;
             case "UPDATE_DISPLAY_SETTINGS":
               console.log("🎨 UPDATE_DISPLAY_SETTINGS received:", data);
               handleUpdateDisplaySettings(data);
@@ -1388,6 +1392,90 @@
 
           console.log("✅ Results displayed in fullscreen");
         }
+      }
+
+      function handleShowResultsAssigned(data) {
+        console.log("🎁 Display: SHOW_RESULTS_ASSIGNED received", data);
+
+        if (!data || !displayGame) {
+          console.warn("No data or displayGame not ready");
+          return;
+        }
+
+        // Hide loading screen
+        const loadingEl = document.getElementById("loadingDisplay");
+        if (loadingEl) {
+          loadingEl.style.display = "none";
+        }
+
+        // Hide race track
+        const raceTrack = document.getElementById("raceTrack");
+        if (raceTrack) {
+          raceTrack.style.display = "none";
+        }
+
+        // Hide victory popup
+        const victoryPopup = document.getElementById("victoryPopup");
+        if (victoryPopup) {
+          victoryPopup.classList.add("hidden");
+        }
+
+        // Update prize title
+        const resultTitle = document.getElementById("resultTitle");
+        if (resultTitle && data.prizeTitle) {
+          resultTitle.innerHTML = `🏆 ${data.prizeTitle}`;
+          console.log("✓ Prize title updated:", data.prizeTitle);
+        }
+
+        // Get result panel
+        const resultPanel = document.getElementById("resultPanel");
+        const resultMessage = document.getElementById("resultMessage");
+
+        if (!resultPanel || !resultMessage) {
+          console.error("Result panel elements not found");
+          return;
+        }
+
+        // Get layout settings
+        const winnersGridWidth =
+          localStorage.getItem("winnersGridWidth") || "95";
+        const cardGap = localStorage.getItem("cardGap") || "1.5";
+
+        // Build HTML for assigned results
+        let html = `<div class="winners-grid" style="width: ${winnersGridWidth}%; gap: ${cardGap}%;">`;
+
+        data.assignments.forEach((assign, index) => {
+          // Find winner info by winnerId
+          const winnerInfo = data.winners.find((w) => w.id == assign.winnerId);
+          const displayName = winnerInfo ? winnerInfo.name : "---";
+          const displayCode =
+            winnerInfo && winnerInfo.code ? winnerInfo.code : "";
+          const medal =
+            index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🏅";
+
+          html += `
+            <div class="winner-card">
+              <div class="winner-medal">${medal}</div>
+              <div class="winner-position">${assign.prizeName}</div>
+              <div class="winner-duck-name">${displayCode} ${displayName}</div>
+            </div>
+          `;
+        });
+
+        html += `</div>`;
+        resultMessage.innerHTML = html;
+
+        // Show result panel in fullscreen
+        resultPanel.classList.remove("hidden");
+        resultPanel.classList.add("fullscreen");
+
+        // Hide all buttons on display
+        const buttons = resultPanel.querySelectorAll("button");
+        buttons.forEach((btn) => {
+          btn.style.display = "none";
+        });
+
+        console.log("✅ Assigned results displayed in fullscreen");
       }
 
       function handleUpdateDisplaySettings(data) {
