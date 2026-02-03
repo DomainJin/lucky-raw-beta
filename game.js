@@ -6178,8 +6178,8 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         ? `<span style="display:inline-block;width:12px;height:12px;background:${winner.color};border-radius:50%;margin-right:5px;"></span>`
         : "";
 
-      // Get prize name directly from winner object (set by script)
-      const prizeName = winner.prizeName || this.currentScriptPrizeName || "";
+      // Get prize name directly from winner object (already saved with script)
+      const prizeName = winner.prizeName || "";
 
       // Create unique ID for winner (using name + index)
       const winnerId = `winner_${index}_${winner.name}`;
