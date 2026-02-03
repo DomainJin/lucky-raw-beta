@@ -1184,6 +1184,48 @@ class Game {
     }
   }
 
+  togglePlayerListSection() {
+    const container = document.getElementById("playerListContainer");
+    const btn = event.target;
+    if (container) {
+      if (container.style.display === "none") {
+        container.style.display = "block";
+        btn.textContent = "−";
+      } else {
+        container.style.display = "none";
+        btn.textContent = "+";
+      }
+    }
+  }
+
+  toggleAudioSection() {
+    const container = document.getElementById("audioContainer");
+    const btn = event.target;
+    if (container) {
+      if (container.style.display === "none") {
+        container.style.display = "block";
+        btn.textContent = "−";
+      } else {
+        container.style.display = "none";
+        btn.textContent = "+";
+      }
+    }
+  }
+
+  toggleDisplaySection() {
+    const container = document.getElementById("displayContainer");
+    const btn = event.target;
+    if (container) {
+      if (container.style.display === "none") {
+        container.style.display = "block";
+        btn.textContent = "−";
+      } else {
+        container.style.display = "none";
+        btn.textContent = "+";
+      }
+    }
+  }
+
   // --- RACE PRIZE MANAGEMENT ---
   addPrizeField(type) {
     if (type === "race") {

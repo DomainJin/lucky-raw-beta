@@ -263,86 +263,104 @@
               font-size: 18px;
               display: flex;
               align-items: center;
+              justify-content: space-between;
               gap: 8px;
             "
           >
-            📊 Danh sách người chơi
+            <span>📊 Danh sách người chơi</span>
+            <button
+              class="btn btn-small"
+              onclick="game.togglePlayerListSection()"
+              style="
+                background: #667eea;
+                padding: 5px 12px;
+                font-size: 14px;
+                margin: 0;
+              "
+            >
+              −
+            </button>
           </h3>
 
-          <!-- Two column layout for Number of Racers and File Upload -->
-          <div
-            style="
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 20px;
-              align-items: start;
-            "
-          >
-            <!-- Left column: Number of Racers -->
-            <div class="input-group" style="margin: 0">
-              <label for="duckCount" style="font-size: 16px; font-weight: bold"
-                >Number of Racers:</label
-              >
-              <input
-                type="number"
-                id="duckCount"
-                min="10"
-                max="10000"
-                value="300"
-                style="
-                  font-size: 18px;
-                  padding: 12px;
-                  font-weight: bold;
-                  width: 100%;
-                "
-              />
-            </div>
-
-            <!-- Right column: Racer List File -->
-            <div class="input-group" style="margin: 0">
-              <label
-                for="duckNamesFile"
-                id="fileLabel"
-                style="font-size: 16px; font-weight: bold; color: #fff"
-              >
-                Racer List File (CSV/Excel):
-              </label>
-              <div style="display: flex; gap: 10px; align-items: center">
+          <div id="playerListContainer" style="display: block">
+            <!-- Two column layout for Number of Racers and File Upload -->
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                align-items: start;
+              "
+            >
+              <!-- Left column: Number of Racers -->
+              <div class="input-group" style="margin: 0">
+                <label
+                  for="duckCount"
+                  style="font-size: 16px; font-weight: bold"
+                  >Number of Racers:</label
+                >
                 <input
-                  type="file"
-                  id="duckNamesFile"
-                  accept=".csv,.xlsx,.xls"
-                  onchange="game.loadDuckNames(event)"
+                  type="number"
+                  id="duckCount"
+                  min="10"
+                  max="10000"
+                  value="300"
                   style="
-                    flex: 1;
-                    font-size: 16px;
+                    font-size: 18px;
                     padding: 12px;
-                    cursor: pointer;
-                    border: 2px dashed #667eea;
-                    border-radius: 8px;
-                    background: rgba(0, 0, 0, 0.3);
+                    font-weight: bold;
+                    width: 100%;
                   "
                 />
-                <button
-                  onclick="game.clearLoadedFile()"
-                  id="clearFileBtn"
-                  class="btn btn-warning"
-                  style="display: none; padding: 12px 20px; font-size: 16px"
-                >
-                  🗑️ Clear
-                </button>
               </div>
-              <small
-                style="
-                  color: #ccc;
-                  display: block;
-                  margin-top: 8px;
-                  font-size: 14px;
-                "
-              >
-              </small>
+
+              <!-- Right column: Racer List File -->
+              <div class="input-group" style="margin: 0">
+                <label
+                  for="duckNamesFile"
+                  id="fileLabel"
+                  style="font-size: 16px; font-weight: bold; color: #fff"
+                >
+                  Racer List File (CSV/Excel):
+                </label>
+                <div style="display: flex; gap: 10px; align-items: center">
+                  <input
+                    type="file"
+                    id="duckNamesFile"
+                    accept=".csv,.xlsx,.xls"
+                    onchange="game.loadDuckNames(event)"
+                    style="
+                      flex: 1;
+                      font-size: 16px;
+                      padding: 12px;
+                      cursor: pointer;
+                      border: 2px dashed #667eea;
+                      border-radius: 8px;
+                      background: rgba(0, 0, 0, 0.3);
+                    "
+                  />
+                  <button
+                    onclick="game.clearLoadedFile()"
+                    id="clearFileBtn"
+                    class="btn btn-warning"
+                    style="display: none; padding: 12px 20px; font-size: 16px"
+                  >
+                    🗑️ Clear
+                  </button>
+                </div>
+                <small
+                  style="
+                    color: #ccc;
+                    display: block;
+                    margin-top: 8px;
+                    font-size: 14px;
+                  "
+                >
+                </small>
+              </div>
             </div>
           </div>
+          <!-- end playerListContainer -->
         </div>
 
         <!-- Audio Settings Section -->
@@ -362,91 +380,107 @@
               font-size: 17px;
               display: flex;
               align-items: center;
+              justify-content: space-between;
               gap: 8px;
             "
           >
-            🔊 Âm thanh
+            <span>🔊 Âm thanh</span>
+            <button
+              class="btn btn-small"
+              onclick="game.toggleAudioSection()"
+              style="
+                background: #2ed573;
+                padding: 5px 12px;
+                font-size: 14px;
+                margin: 0;
+              "
+            >
+              −
+            </button>
           </h3>
 
-          <!-- Two column layout for Enable Sound and Custom Race Sound -->
-          <div
-            style="
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 20px;
-              align-items: start;
-            "
-          >
-            <!-- Left column: Enable Sound -->
-            <div class="input-group" style="margin: 0">
-              <label
-                for="soundToggle"
-                style="
-                  font-size: 17px;
-                  display: flex;
-                  align-items: center;
-                  gap: 10px;
-                  cursor: pointer;
-                  padding: 10px;
-                  background: rgba(0, 0, 0, 0.2);
-                  border-radius: 6px;
-                  border: 1px solid #2ed573;
-                "
-              >
-                <input
-                  type="checkbox"
-                  id="soundToggle"
-                  checked
-                  style="width: 24px; height: 24px; cursor: pointer"
-                />
-                <span style="font-weight: 600">Enable Sound</span>
-              </label>
-            </div>
-
-            <!-- Right column: Custom Race Sound -->
-            <div class="input-group" style="margin: 0">
-              <label
-                for="customSoundFile"
-                id="audioFileLabel"
-                style="font-size: 15px; font-weight: 500"
-                >Custom Race Sound (MP3):</label
-              >
-              <div style="display: flex; gap: 10px; align-items: center">
-                <input
-                  type="file"
-                  id="customSoundFile"
-                  accept=".mp3,.wav,.ogg"
+          <div id="audioContainer" style="display: block">
+            <!-- Two column layout for Enable Sound and Custom Race Sound -->
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                align-items: start;
+              "
+            >
+              <!-- Left column: Enable Sound -->
+              <div class="input-group" style="margin: 0">
+                <label
+                  for="soundToggle"
                   style="
-                    flex: 1;
+                    font-size: 17px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    cursor: pointer;
                     padding: 10px;
-                    font-size: 14px;
-                    border: 1px solid #2ed573;
-                    border-radius: 6px;
                     background: rgba(0, 0, 0, 0.2);
+                    border-radius: 6px;
+                    border: 1px solid #2ed573;
                   "
-                />
-                <button
-                  onclick="game.clearAudioFile()"
-                  id="clearAudioBtn"
-                  class="btn btn-warning"
-                  style="display: none; padding: 10px 16px; font-size: 14px"
                 >
-                  🗑️ Clear
-                </button>
+                  <input
+                    type="checkbox"
+                    id="soundToggle"
+                    checked
+                    style="width: 24px; height: 24px; cursor: pointer"
+                  />
+                  <span style="font-weight: 600">Enable Sound</span>
+                </label>
               </div>
-              <small
-                style="
-                  color: #2ed573;
-                  display: block;
-                  margin-top: 5px;
-                  font-weight: 500;
-                "
-              >
-                <br />
-                <strong style="color: #ffd700"></strong>
-              </small>
+
+              <!-- Right column: Custom Race Sound -->
+              <div class="input-group" style="margin: 0">
+                <label
+                  for="customSoundFile"
+                  id="audioFileLabel"
+                  style="font-size: 15px; font-weight: 500"
+                  >Custom Race Sound (MP3):</label
+                >
+                <div style="display: flex; gap: 10px; align-items: center">
+                  <input
+                    type="file"
+                    id="customSoundFile"
+                    accept=".mp3,.wav,.ogg"
+                    style="
+                      flex: 1;
+                      padding: 10px;
+                      font-size: 14px;
+                      border: 1px solid #2ed573;
+                      border-radius: 6px;
+                      background: rgba(0, 0, 0, 0.2);
+                    "
+                  />
+                  <button
+                    onclick="game.clearAudioFile()"
+                    id="clearAudioBtn"
+                    class="btn btn-warning"
+                    style="display: none; padding: 10px 16px; font-size: 14px"
+                  >
+                    🗑️ Clear
+                  </button>
+                </div>
+                <small
+                  style="
+                    color: #2ed573;
+                    display: block;
+                    margin-top: 5px;
+                    font-weight: 500;
+                  "
+                >
+                  <br />
+                  <strong style="color: #ffd700"></strong>
+                </small>
+              </div>
             </div>
           </div>
+          <!-- end audioContainer -->
         </div>
 
         <!-- Display Settings Section -->
@@ -466,91 +500,112 @@
               font-size: 17px;
               display: flex;
               align-items: center;
+              justify-content: space-between;
               gap: 8px;
             "
           >
-            🖥️ Cài đặt màn hình
+            <span>🖥️ Cài đặt màn hình</span>
+            <button
+              class="btn btn-small"
+              onclick="game.toggleDisplaySection()"
+              style="
+                background: #ff9f40;
+                padding: 5px 12px;
+                font-size: 14px;
+                margin: 0;
+              "
+            >
+              −
+            </button>
           </h3>
-          <div style="display: flex; flex-direction: column; gap: 8px">
-            <label style="font-size: 15px; color: #fff; font-weight: 500"
-              >Race Track Aspect Ratio:</label
-            >
-            <input
-              type="text"
-              id="raceTrackAspectRatio"
-              value="20:5"
-              placeholder="e.g., 16:9, 30:9, 21:9"
-              style="
-                padding: 12px;
-                background: rgba(0, 0, 0, 0.3);
-                border: 1px solid #ff9f40;
-                border-radius: 6px;
-                color: #fff;
-                font-size: 16px;
-              "
-              oninput="validateAspectRatioInput(this)"
-            />
-            <small style="color: #888; font-size: 13px">
-              Format: width:height (e.g., 16:9, 30:9)
-            </small>
-          </div>
+          <div id="displayContainer" style="display: block">
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <label style="font-size: 15px; color: #fff; font-weight: 500"
+                >Race Track Aspect Ratio:</label
+              >
+              <input
+                type="text"
+                id="raceTrackAspectRatio"
+                value="20:5"
+                placeholder="e.g., 16:9, 30:9, 21:9"
+                style="
+                  padding: 12px;
+                  background: rgba(0, 0, 0, 0.3);
+                  border: 1px solid #ff9f40;
+                  border-radius: 6px;
+                  color: #fff;
+                  font-size: 16px;
+                "
+                oninput="validateAspectRatioInput(this)"
+              />
+              <small style="color: #888; font-size: 13px">
+                Format: width:height (e.g., 16:9, 30:9)
+              </small>
+            </div>
 
-          <div
-            class="input-group"
-            style="margin-top: 15px; display: flex; gap: 10px"
-          >
-            <button
-              class="btn btn-small"
-              onclick="game.applyResultPanelSettings()"
-              style="
-                background: #667eea;
-                flex: 1;
-                padding: 12px;
-                font-size: 15px;
-              "
+            <div
+              class="input-group"
+              style="margin-top: 15px; display: flex; gap: 10px"
             >
-              ✓ Apply
-            </button>
-            <button
-              class="btn btn-small"
-              onclick="game.resetResultPanelSettings()"
-              style="background: #888; flex: 1; padding: 12px; font-size: 15px"
-            >
-              ⟲ Reset
-            </button>
-          </div>
+              <button
+                class="btn btn-small"
+                onclick="game.applyResultPanelSettings()"
+                style="
+                  background: #667eea;
+                  flex: 1;
+                  padding: 12px;
+                  font-size: 15px;
+                "
+              >
+                ✓ Apply
+              </button>
+              <button
+                class="btn btn-small"
+                onclick="game.resetResultPanelSettings()"
+                style="
+                  background: #888;
+                  flex: 1;
+                  padding: 12px;
+                  font-size: 15px;
+                "
+              >
+                ⟲ Reset
+              </button>
+            </div>
 
-          <!-- Open Display Button -->
-          <div class="input-group" style="margin-top: 20px">
-            <a
-              href="display.html"
-              target="_blank"
-              class="btn btn-secondary"
-              id="openDisplayBtn"
-              style="
-                width: 100%;
-                padding: 18px;
-                font-size: 20px;
-                font-weight: bold;
-                margin-bottom: 10px;
-                text-align: center;
-                text-decoration: none;
-                display: inline-block;
-                pointer-events: none;
-                opacity: 0.5;
-                background: linear-gradient(135deg, #667eea, #764ba2);
-                border: none;
-                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-              "
-            >
-              ⏳ Loading Icons...
-            </a>
-            <small
-              style="color: #ffd700; font-weight: bold; font-size: 15px"
-            ></small
-            ><br />
-            <small style="color: #888; font-size: 13px"></small>
+            <!-- Open Display Button -->
+            <div class="input-group" style="margin-top: 20px">
+              <a
+                href="display.html"
+                target="_blank"
+                class="btn btn-secondary"
+                id="openDisplayBtn"
+                style="
+                  width: 100%;
+                  padding: 18px;
+                  font-size: 20px;
+                  font-weight: bold;
+                  margin-bottom: 10px;
+                  text-align: center;
+                  text-decoration: none;
+                  display: inline-block;
+                  pointer-events: none;
+                  opacity: 0.5;
+                  background: linear-gradient(135deg, #667eea, #764ba2);
+                  border: none;
+                  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+                "
+              >
+                ⏳ Loading Icons...
+              </a>
+              <small
+                style="color: #ffd700; font-weight: bold; font-size: 15px"
+              ></small
+              ><br />
+              <small style="color: #888; font-size: 13px"></small>
+            </div>
           </div>
+          <!-- end displayContainer -->
         </div>
 
         <!-- Control Panel (for control window) -->
