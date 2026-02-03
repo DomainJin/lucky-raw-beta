@@ -1100,131 +1100,8 @@ class Game {
   //     ... (code kept for reference but not used)
   // }
 
-  // Result Panel Appearance Settings
-  getPrizeTitle() {
-    // First priority: use current script's prize name
-    if (this.currentScriptPrizeName) {
-      return this.currentScriptPrizeName;
-    }
-    // Fallback: use saved title or default
-    const savedTitle = localStorage.getItem("customPrizeTitle");
-    return savedTitle || "Prize Results";
-  }
-
-  savePrizeTitle() {
-    const titleInput = document.getElementById("prizeTitleInput");
-    if (titleInput) {
-      const title = titleInput.value.trim() || "Prize Results";
-      localStorage.setItem("customPrizeTitle", title);
-    }
-  }
-
-  // Add a new prize name field
-  addPrizeNameField(position = null) {
-    const container = document.getElementById("prizeNamesContainer");
-    if (!container) return;
-
-    // If no position specified, find the next position
-    if (position === null) {
-      const existingFields = container.querySelectorAll(".prize-name-field");
-      position = existingFields.length + 1;
-    }
-
-    // Create field HTML
-    const fieldDiv = document.createElement("div");
-    fieldDiv.className = "prize-name-field";
-    fieldDiv.style.cssText = "display: flex; align-items: center; gap: 8px;";
-    fieldDiv.innerHTML = `
-            <label style="min-width: 70px; font-size: 14px; color: #fff;">Prize ${position}:</label>
-            <input type="text" id="prizeName${position}" placeholder="Prize ${position}" maxlength="50" 
-                   style="padding: 5px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; flex: 1; font-size: 13px;"
-                   onchange="game.savePrizeNames()">
-            <button onclick="game.removePrizeNameField(${position})" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px; background: rgba(255,0,0,0.3);">Remove</button>
-        `;
-
-    container.appendChild(fieldDiv);
-  }
-
-  // Remove a prize name field
-  removePrizeNameField(position) {
-    const container = document.getElementById("prizeNamesContainer");
-    if (!container) return;
-
-    const fields = Array.from(container.querySelectorAll(".prize-name-field"));
-    if (fields.length <= 1) {
-      alert("Must keep at least one prize name field!");
-      return;
-    }
-
-    // Remove the field
-    const field = fields.find((f) => f.querySelector(`#prizeName${position}`));
-    if (field) {
-      field.remove();
-    }
-
-    // Save after removing
-    this.savePrizeNames();
-  }
-
-  // Sort prize names (ascending 1,2,3... or descending N...3,2,1)
-  sortPrizeNames(order = "asc") {
-    const container = document.getElementById("prizeNamesContainer");
-    if (!container) return;
-
-    // Get all prize fields with their data
-    const fields = Array.from(container.querySelectorAll(".prize-name-field"));
-    const prizeData = fields.map((field) => {
-      const input = field.querySelector('input[id^="prizeName"]');
-      const position = parseInt(input.id.replace("prizeName", ""));
-      return {
-        position: position,
-        value: input.value.trim(),
-      };
-    });
-
-    // Sort by position
-    prizeData.sort((a, b) => {
-      if (order === "asc") {
-        return a.position - b.position;
-      } else {
-        return b.position - a.position;
-      }
-    });
-
-    // Clear container
-    container.innerHTML = "";
-
-    // Re-create fields in sorted order
-    prizeData.forEach((data) => {
-      this.addPrizeNameField(data.position);
-      const input = document.getElementById(`prizeName${data.position}`);
-      if (input && data.value) {
-        input.value = data.value;
-      }
-    });
-
-    // Save sort order to localStorage
-    localStorage.setItem("prizeNamesSortOrder", order);
-
-    console.log(
-      `✓ Prize names sorted ${order === "asc" ? "ascending (1-N)" : "descending (N-1)"}`,
-    );
-  }
-
-  savePrizeNames() {
-    const prizeNames = {};
-    const container = document.getElementById("prizeNamesContainer");
-    if (!container) return;
-
-    const inputs = container.querySelectorAll('input[id^="prizeName"]');
-    inputs.forEach((input) => {
-      const position = parseInt(input.id.replace("prizeName", ""));
-      if (input.value.trim()) {
-        prizeNames[position] = input.value.trim();
-      }
-    });
-    localStorage.setItem("customPrizeNames", JSON.stringify(prizeNames));
-  }
+  // Removed getPrizeTitle, savePrizeTitle, addPrizeNameField, removePrizeNameField, sortPrizeNames, savePrizeNames
+  // Prize name now comes from script only via this.currentScriptPrizeName
 
   getPositionSuffix(pos) {
     if (pos === 1) return "st";
@@ -1282,63 +1159,7 @@ class Game {
     return duck.name;
   }
 
-  loadPrizeNames() {
-    const container = document.getElementById("prizeNamesContainer");
-    if (!container) return;
-
-    // Clear existing fields
-    container.innerHTML = "";
-
-    const savedNames = localStorage.getItem("customPrizeNames");
-    const savedSortOrder = localStorage.getItem("prizeNamesSortOrder") || "asc";
-    let prizeNames = {};
-
-    if (savedNames) {
-      try {
-        prizeNames = JSON.parse(savedNames);
-      } catch (e) {
-        console.error("Failed to parse prize names:", e);
-      }
-    }
-
-    // Get all positions (saved + ensure at least first 3)
-    const positions = Object.keys(prizeNames).map((k) => parseInt(k));
-    const maxPosition = positions.length > 0 ? Math.max(...positions) : 0;
-    const fieldsToShow = Math.max(maxPosition, 3);
-
-    // Create array of positions to display
-    let displayPositions = [];
-    for (let i = 1; i <= fieldsToShow; i++) {
-      displayPositions.push(i);
-    }
-
-    // Sort display order based on saved sort order
-    if (savedSortOrder === "desc") {
-      displayPositions.reverse();
-    }
-
-    // Create fields in sorted order
-    displayPositions.forEach((position) => {
-      this.addPrizeNameField(position);
-      const input = document.getElementById(`prizeName${position}`);
-      if (input && prizeNames[position]) {
-        input.value = prizeNames[position];
-      }
-    });
-
-    // If no fields exist, add at least 3 default fields
-    if (fieldsToShow === 0) {
-      displayPositions = [1, 2, 3];
-      if (savedSortOrder === "desc") {
-        displayPositions.reverse();
-      }
-      displayPositions.forEach((i) => {
-        this.addPrizeNameField(i);
-      });
-    }
-
-    console.log(`✓ Prize names loaded with sort order: ${savedSortOrder}`);
-  }
+  // loadPrizeNames() removed - prize names now come from scripts only
 
   toggleResultPanelSettings() {
     const container = document.getElementById("resultPanelSettingsContainer");
@@ -1692,6 +1513,29 @@ class Game {
         `Có script khác đang chạy: "${runningScript.prizeName}"!\nVui lòng đợi script hiện tại hoàn thành.`,
       );
       return;
+    }
+
+    // Check if display is connected
+    if (!this.displayReady) {
+      const openDisplay = confirm(
+        `⚠️ Chưa mở Display!\n\n` +
+          `Vui lòng:\n` +
+          `1. Nhấn "OK" để tiếp tục mở Display\n` +
+          `2. Nhấn nút "📺 Open Display" ở góc trên bên phải\n` +
+          `3. Sau khi Display đã sẵn sàng, quay lại đây và nhấn START lại\n\n` +
+          `Nhấn "Cancel" nếu muốn chạy mà không có Display (không khuyến nghị).`,
+      );
+
+      if (openDisplay) {
+        alert(
+          "📺 Hãy nhấn nút 'Open Display' ở góc trên bên phải màn hình!\n\n" +
+            "Sau khi Display đã mở, quay lại đây và nhấn START lại.",
+        );
+        return;
+      } else {
+        // User chose to continue without display
+        console.warn("⚠️ User chose to start race without display");
+      }
     }
 
     // Set up race with script configuration
@@ -2430,18 +2274,13 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
   }
 
   applyResultPanelSettings() {
-    // Save custom prize title and prize names
-    this.savePrizeTitle();
-    this.savePrizeNames();
+    // Removed savePrizeTitle() and savePrizeNames() - prize name comes from script only
 
     const bgType = document.getElementById("resultBgType").value;
     const bgColor = document.getElementById("resultBgColor").value;
     const bgImage = localStorage.getItem("resultPanelBackgroundImage");
-    const prizeTitle =
-      localStorage.getItem("customPrizeTitle") || "Prize Results";
-    const prizeNames = JSON.parse(
-      localStorage.getItem("customPrizeNames") || "{}",
-    );
+    const prizeTitle = this.currentScriptPrizeName || "Kết quả"; // Use current script prize name
+    const prizeNames = {}; // Not used anymore
 
     // Get layout settings
     const winnersGridWidthEl = document.getElementById("winnersGridWidth");
@@ -2548,7 +2387,8 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
           const medal =
             index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `🏅`;
           // Always use prizeName from winner object (set by script)
-          const prizeName = winner.prizeName || "Prize";
+          const prizeName =
+            winner.prizeName || this.currentScriptPrizeName || "";
           html += `
                         <div class="winner-card">
                             <div class="winner-medal">${medal}</div>
@@ -2729,14 +2569,13 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       if (gapValueEl) gapValueEl.textContent = savedGap + "%";
     }
 
-    // Load custom prize names
-    this.loadPrizeNames();
+    // Removed loadPrizeNames() - prize names now come from scripts only
 
     // Apply prize title to result panel (for display mode)
     if (this.isDisplayMode) {
       const resultTitle = document.querySelector(".result-title");
-      if (resultTitle && savedTitle) {
-        resultTitle.textContent = savedTitle;
+      if (resultTitle && this.currentScriptPrizeName) {
+        resultTitle.textContent = this.currentScriptPrizeName;
       }
     }
 
@@ -3652,6 +3491,29 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         "⚠️ Vui lòng chọn script để chạy!\n\nNhấn nút START bên cạnh script bạn muốn chạy.",
       );
       return;
+    }
+
+    // Check if display is connected
+    if (!this.displayReady) {
+      const openDisplay = confirm(
+        `⚠️ Chưa mở Display!\n\n` +
+          `Vui lòng:\n` +
+          `1. Nhấn "OK" để tiếp tục mở Display\n` +
+          `2. Nhấn nút "📺 Open Display" ở góc trên bên phải\n` +
+          `3. Sau khi Display đã sẵn sàng, quay lại đây và nhấn START lại\n\n` +
+          `Nhấn "Cancel" nếu muốn chạy mà không có Display (không khuyến nghị).`,
+      );
+
+      if (openDisplay) {
+        alert(
+          "📺 Hãy nhấn nút 'Open Display' ở góc trên bên phải màn hình!\n\n" +
+            "Sau khi Display đã mở, quay lại đây và nhấn START lại.",
+        );
+        return;
+      } else {
+        // User chose to continue without display
+        console.warn("⚠️ User chose to start race without display");
+      }
     }
 
     // Now actually start the race
@@ -5005,6 +4867,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
               iconSrc: duck.iconSrc,
               finishTime: duck.finishTime,
               position: duck.position,
+              prizeName: this.currentScriptPrizeName || "", // Add prizeName from script
             });
 
             console.log(
@@ -6112,7 +5975,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         : "";
 
       // Get prize name directly from winner object (set by script)
-      const prizeName = winner.prizeName || "Prize";
+      const prizeName = winner.prizeName || this.currentScriptPrizeName || "";
 
       // Create unique ID for winner (using name + index)
       const winnerId = `winner_${index}_${winner.name}`;
@@ -6516,7 +6379,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🏅";
 
       // Always use prizeName from winner object (set by script)
-      const prizeName = winner.prizeName || "Prize";
+      const prizeName = winner.prizeName || this.currentScriptPrizeName || "";
 
       console.log(
         `Winner ${index}: prizeName="${prizeName}" (from winner.prizeName="${winner.prizeName}")`,
@@ -6784,12 +6647,12 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         data: {
           winners: this.winners,
           totalRaces: this.stats.totalRaces,
-          prizeTitle: this.getPrizeTitle(), // Add prize title
+          prizeTitle: this.currentScriptPrizeName || "Kết quả", // Use current script prize name
         },
       });
     }
 
-    const prizeTitle = this.getPrizeTitle();
+    const prizeTitle = this.currentScriptPrizeName || "Kết quả";
     document.getElementById("resultTitle").innerHTML =
       `🏆 ${prizeTitle} - Top ${this.winners.length}`;
 
@@ -6805,7 +6668,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         const medal =
           index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `🏅`;
         // Always use prizeName from winner object (set by script)
-        const prizeName = winner.prizeName || "Prize";
+        const prizeName = winner.prizeName || this.currentScriptPrizeName || "";
 
         // Create duck icon
         let iconHTML = "";
@@ -6851,7 +6714,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     const resultPanel = document.getElementById("resultPanel");
     resultPanel.classList.remove("hidden");
 
-    const prizeTitle = this.getPrizeTitle();
+    const prizeTitle = this.currentScriptPrizeName || "Kết quả";
     document.getElementById("resultTitle").innerHTML = `🏆 ${prizeTitle}`;
 
     // Get saved layout settings
@@ -6866,7 +6729,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         const medal =
           index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `🏅`;
         // Always use prizeName from winner object (set by script)
-        const prizeName = winner.prizeName || "Prize";
+        const prizeName = winner.prizeName || this.currentScriptPrizeName || "";
         html += `
                     <div class="winner-card">
                         <div class="winner-medal">${medal}</div>
@@ -6915,7 +6778,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       data: {
         winners: this.winners,
         totalRaces: this.stats.totalRaces,
-        prizeTitle: this.getPrizeTitle(), // Add prize title from current script
+        prizeTitle: this.currentScriptPrizeName || "Kết quả", // Use current script prize name
       },
     });
 
