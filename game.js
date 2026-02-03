@@ -1944,8 +1944,30 @@ class Game {
     // Update UI
     this.renderPrizeAssignmentUI();
 
-    alert("✓ Đã xóa tất cả hàng gán giải!");
-    console.log("✓ Cleared all result assignments");
+    console.log("✓ All prize result assignments cleared");
+    alert("✓ Đã xóa tất cả gán giải!");
+  }
+
+  reverseAssignments() {
+    if (this.prizeResultAssignments.length === 0) {
+      alert("Danh sách gán giải đang trống!");
+      return;
+    }
+
+    // Reverse the array
+    this.prizeResultAssignments.reverse();
+
+    // Save to localStorage
+    localStorage.setItem(
+      "prizeResultAssignments",
+      JSON.stringify(this.prizeResultAssignments),
+    );
+
+    // Update UI
+    this.renderPrizeAssignmentUI();
+
+    console.log("✓ Prize assignments reversed:", this.prizeResultAssignments);
+    alert(`✓ Đã đảo ngược thứ tự ${this.prizeResultAssignments.length} hàng!`);
   }
 
   loadVictoryHistoryToAssignments() {
