@@ -988,6 +988,17 @@
                 );
               }
               break;
+            case "FORCE_CLOSE_DISPLAY":
+              console.log(
+                "🚪 FORCE_CLOSE_DISPLAY received - closing display tab",
+              );
+              // Close the display window/tab
+              window.close();
+              // If window.close() doesn't work (some browsers block it), show message
+              setTimeout(() => {
+                alert("Vui lòng đóng tab Display này thủ công.");
+              }, 100);
+              break;
             default:
               console.log("Unknown message type:", type);
           }
@@ -1474,9 +1485,9 @@
 
         // Apply prize title
         if (data.prizeTitle) {
-          const resultTitle = document.querySelector(".result-title");
+          const resultTitle = document.getElementById("resultTitle");
           if (resultTitle) {
-            resultTitle.textContent = data.prizeTitle;
+            resultTitle.innerHTML = `🏆 ${data.prizeTitle}`;
             console.log("✓ Prize title updated:", data.prizeTitle);
           }
           // Save to localStorage for next load

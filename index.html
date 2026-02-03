@@ -688,8 +688,6 @@
               class="main-panel-prize-settings"
               style="font-size: 14px; color: #fff; margin-bottom: 10px"
             >
-              Prize Panel Settings
-
               <div class="input-group">
                 <label for="prizeTitleInput">Prize Title:</label>
                 <input
@@ -709,163 +707,6 @@
                 />
                 <small style="color: #888"
                   >This will appear on result panel and popup</small
-                >
-              </div>
-
-              <!-- Race Prize Settings: Hidden, using simplified version above -->
-              <div
-                class="main-panel-prize-settings"
-                style="
-                  display: none;
-                  margin-top: 15px;
-                  padding: 10px;
-                  background: rgba(255, 215, 0, 0.1);
-                  border: 1px solid #ffd700;
-                  border-radius: 5px;
-                "
-              >
-                <h4 style="color: #ffd700; font-size: 16px; margin: 0 0 10px 0">
-                  🏁 Cài đặt Giải thưởng cho Cuộc đua (Race)
-                </h4>
-
-                <!-- Prize Group Input -->
-                <div
-                  style="
-                    background: rgba(0, 0, 0, 0.3);
-                    padding: 12px;
-                    border-radius: 5px;
-                    margin-bottom: 10px;
-                  "
-                >
-                  <div style="display: flex; gap: 8px; margin-bottom: 8px">
-                    <input
-                      type="text"
-                      id="prizeGroupName"
-                      placeholder="Tên giải (VD: Giải Khuyến Khích)"
-                      style="
-                        flex: 2;
-                        padding: 8px;
-                        background: #222;
-                        color: white;
-                        border: 1px solid #444;
-                        border-radius: 3px;
-                      "
-                    />
-                    <input
-                      type="number"
-                      id="prizeGroupCount"
-                      placeholder="Số người"
-                      min="1"
-                      value="1"
-                      style="
-                        flex: 1;
-                        padding: 8px;
-                        background: #222;
-                        color: white;
-                        border: 1px solid #444;
-                        border-radius: 3px;
-                        max-width: 100px;
-                      "
-                    />
-                    <button
-                      class="btn btn-small"
-                      onclick="game.addPrizeGroup()"
-                      style="
-                        background: #27ae60;
-                        padding: 8px 15px;
-                        font-size: 13px;
-                        white-space: nowrap;
-                      "
-                    >
-                      + Thêm nhóm giải
-                    </button>
-                  </div>
-                  <small style="color: #888; display: block">
-                    💡 VD: "Giải Khuyến Khích" + 30 người → tạo 30 giải cùng tên
-                  </small>
-                </div>
-
-                <!-- Prize List -->
-                <div
-                  id="prizeNamesRaceContainer"
-                  style="
-                    display: flex;
-                    flex-direction: column;
-                    gap: 8px;
-                    max-height: 250px;
-                    overflow-y: auto;
-                  "
-                >
-                  <!-- Prize fields for race will be dynamically added here -->
-                </div>
-                <div style="margin-top: 10px; display: flex; gap: 5px">
-                  <button
-                    class="btn btn-small"
-                    onclick="game.clearAllPrizes()"
-                    style="
-                      background: #c0392b;
-                      padding: 5px 10px;
-                      font-size: 12px;
-                    "
-                  >
-                    🗑️ Xóa tất cả
-                  </button>
-                  <button
-                    class="btn btn-small"
-                    onclick="game.showRacePrizes()"
-                    style="
-                      background: #27ae60;
-                      padding: 5px 10px;
-                      font-size: 12px;
-                    "
-                  >
-                    📋 Show Race Prizes
-                  </button>
-                  <button
-                    class="btn btn-small"
-                    onclick="game.applyPrizeRace()"
-                    style="
-                      background: #2980b9;
-                      padding: 5px 10px;
-                      font-size: 12px;
-                    "
-                  >
-                    ✓ Apply Race Prizes
-                  </button>
-                </div>
-
-                <!-- Race Prizes Display (Toggle) -->
-                <div
-                  id="racePrizesDisplay"
-                  style="
-                    display: none;
-                    margin-top: 10px;
-                    padding: 10px;
-                    background: rgba(0, 0, 0, 0.4);
-                    border-radius: 5px;
-                    border: 1px solid #ffd700;
-                    max-height: 200px;
-                    overflow-y: auto;
-                  "
-                >
-                  <div
-                    style="
-                      color: #ffd700;
-                      font-weight: bold;
-                      margin-bottom: 5px;
-                    "
-                  >
-                    🏆 Race Prizes List:
-                  </div>
-                  <div
-                    id="racePrizesContent"
-                    style="color: #fff; font-size: 13px; line-height: 1.6"
-                  ></div>
-                </div>
-
-                <small style="color: #888; margin-top: 8px; display: block"
-                  >* Giải thưởng này sẽ hiện trên Pop-up VICTORY ngay khi vịt
-                  vừa chạm đích.</small
                 >
               </div>
 
@@ -953,7 +794,25 @@
                 >
                   <!-- Prize assignment fields will be dynamically added here -->
                 </div>
-                <div style="margin-top: 10px; display: flex; gap: 5px">
+                <div
+                  style="
+                    margin-top: 10px;
+                    display: flex;
+                    gap: 5px;
+                    flex-wrap: wrap;
+                  "
+                >
+                  <button
+                    class="btn btn-small"
+                    onclick="game.loadVictoryHistoryToAssignments()"
+                    style="
+                      background: #f39c12;
+                      padding: 5px 10px;
+                      font-size: 12px;
+                    "
+                  >
+                    📜 Load Victory History
+                  </button>
                   <button
                     class="btn btn-small"
                     onclick="game.clearAllResultAssignments()"

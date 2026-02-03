@@ -1031,7 +1031,8 @@ class Game {
     }, 500);
 
     // this.updateStatsDisplay(); // Stats panel removed
-    // Don't update history - removed
+    // Update history to display victory history on load
+    this.updateHistoryWin();
 
     // Load result panel settings for both control and display mode
     this.loadResultPanelSettings();
@@ -1539,7 +1540,17 @@ class Game {
     }
 
     // Set up race with script configuration
-    this.prizeRaceList = Array(script.winnerCount).fill(script.prizeName);
+    // Create prizeRaceList with unique names for each winner
+    this.prizeRaceList = [];
+    for (let i = 0; i < script.winnerCount; i++) {
+      // If script has multiple winners, append position number to prize name
+      if (script.winnerCount > 1) {
+        this.prizeRaceList.push(`${script.prizeName} ${i + 1}`);
+      } else {
+        this.prizeRaceList.push(script.prizeName);
+      }
+    }
+
     this.winnerCount = script.winnerCount;
     this.usedPrizesCount = 0;
     this.currentScriptPrizeName = script.prizeName; // Save current script's prize name
@@ -1872,47 +1883,64 @@ class Game {
     console.log("✓ Cleared all result assignments");
   }
 
+  loadVictoryHistoryToAssignments() {
+    // Load winners from victory history and populate prize assignments
+    if (!this.winners || this.winners.length === 0) {
+      alert(
+        "⚠️ Chưa có Victory History!\n\nVui lòng chạy cuộc đua trước để tạo danh sách người chiến thắng.",
+      );
+      return;
+    }
+
+    // Clear existing assignments first
+    this.prizeResultAssignments = [];
+
+    // Create assignments from all winners
+    this.winners.forEach((winner, index) => {
+      // Use winner's actual prizeName (each winner has their own prize name from the race)
+      // This is the most accurate source since it was assigned during the race
+      let prizeName = winner.prizeName || `Giải ${index + 1}`;
+
+      this.prizeResultAssignments.push({
+        prizeName: prizeName,
+        winnerId: winner.id,
+      });
+    });
+
+    // Save to localStorage
+    localStorage.setItem(
+      "prizeResultAssignments",
+      JSON.stringify(this.prizeResultAssignments),
+    );
+
+    // Update UI
+    this.renderPrizeAssignmentUI();
+
+    alert(`✓ Đã load ${this.winners.length} người từ Victory History!`);
+    console.log(`✓ Loaded ${this.winners.length} winners to prize assignments`);
+  }
+
   renderPrizeAssignmentUI() {
     const container = document.getElementById("prizeAssignmentResultContainer");
     if (!container) return;
 
-    // Auto-sync with winners: add new winners AND update prize names
-    if (this.winners.length > 0) {
-      // Get existing winner IDs in assignments
-      const existingWinnerIds = new Set(
-        this.prizeResultAssignments.map((a) => a.winnerId),
-      );
+    console.log(
+      "renderPrizeAssignmentUI called with",
+      this.prizeResultAssignments.length,
+      "assignments",
+    );
 
-      // Add new winners that aren't in the list yet
-      this.winners.forEach((winner, index) => {
-        if (!existingWinnerIds.has(winner.id)) {
-          const prizeName = this.prizeRaceList[index];
-          if (prizeName) {
-            this.prizeResultAssignments.push({
-              prizeName: prizeName,
-              winnerId: winner.id,
-            });
-            console.log(`✓ Added new winner to assignments: ${winner.name}`);
-          }
-        }
-      });
+    // Don't auto-sync or override when called from loadVictoryHistoryToAssignments
+    // Just render what's already in prizeResultAssignments
 
-      // Update prize names for existing assignments to match current prizeRaceList
-      this.prizeResultAssignments.forEach((assign, index) => {
-        const newPrizeName = this.prizeRaceList[index];
-        if (newPrizeName && assign.prizeName !== newPrizeName) {
-          assign.prizeName = newPrizeName;
-          console.log(
-            `✓ Updated prize name for assignment ${index}: "${newPrizeName}"`,
-          );
-        }
-      });
-
-      // Save updated assignments
-      localStorage.setItem(
-        "prizeResultAssignments",
-        JSON.stringify(this.prizeResultAssignments),
-      );
+    // If no assignments, show empty message
+    if (
+      !this.prizeResultAssignments ||
+      this.prizeResultAssignments.length === 0
+    ) {
+      container.innerHTML =
+        '<p style="color: #888; padding: 10px;">Chưa có gán giải. Nhấn "Load Victory History" để tải danh sách.</p>';
+      return;
     }
 
     // Load checkbox states from localStorage
@@ -1933,7 +1961,7 @@ class Game {
     container.innerHTML = this.prizeResultAssignments
       .map(
         (assign, index) => `
-        <div style="display: flex; gap: 10px; align-items: center; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 5px;">
+        <div style="display: flex; gap: 5px; align-items: center; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 5px;">
             <input type="text" placeholder="Tên giải" value="${assign.prizeName}" 
                    onchange="game.prizeResultAssignments[${index}].prizeName = this.value"
                    style="flex: 1; padding: 5px; background: #111; color: #ffd700; border: 1px solid #333; border-radius: 3px;">
@@ -1943,8 +1971,17 @@ class Game {
                 <option value="">-- Chọn người nhận --</option>
                 ${winnerOptions}
             </select>
+            <button onclick="game.moveAssignmentUp(${index});" 
+                    ${index === 0 ? "disabled" : ""}
+                    style="background: #3498db; border: none; color: white; padding: 5px 8px; border-radius: 3px; cursor: pointer; ${index === 0 ? "opacity: 0.5; cursor: not-allowed;" : ""}" 
+                    title="Di chuyển lên">↑</button>
+            <button onclick="game.moveAssignmentDown(${index});" 
+                    ${index === this.prizeResultAssignments.length - 1 ? "disabled" : ""}
+                    style="background: #3498db; border: none; color: white; padding: 5px 8px; border-radius: 3px; cursor: pointer; ${index === this.prizeResultAssignments.length - 1 ? "opacity: 0.5; cursor: not-allowed;" : ""}" 
+                    title="Di chuyển xuống">↓</button>
             <button onclick="game.removePrizeAssignment(${index});" 
-                    style="background: #c0392b; border: none; color: white; padding: 5px 10px; border-radius: 3px; cursor: pointer;">X</button>
+                    style="background: #c0392b; border: none; color: white; padding: 5px 10px; border-radius: 3px; cursor: pointer;" 
+                    title="Xóa">X</button>
         </div>
     `,
       )
@@ -1959,7 +1996,51 @@ class Game {
 
   removePrizeAssignment(index) {
     this.prizeResultAssignments.splice(index, 1);
+    localStorage.setItem(
+      "prizeResultAssignments",
+      JSON.stringify(this.prizeResultAssignments),
+    );
     this.renderPrizeAssignmentUI();
+  }
+
+  moveAssignmentUp(index) {
+    if (index === 0) return; // Already at top
+
+    // Swap with previous item
+    const temp = this.prizeResultAssignments[index];
+    this.prizeResultAssignments[index] = this.prizeResultAssignments[index - 1];
+    this.prizeResultAssignments[index - 1] = temp;
+
+    // Save to localStorage
+    localStorage.setItem(
+      "prizeResultAssignments",
+      JSON.stringify(this.prizeResultAssignments),
+    );
+
+    // Re-render
+    this.renderPrizeAssignmentUI();
+    console.log(`✓ Moved assignment up from position ${index} to ${index - 1}`);
+  }
+
+  moveAssignmentDown(index) {
+    if (index === this.prizeResultAssignments.length - 1) return; // Already at bottom
+
+    // Swap with next item
+    const temp = this.prizeResultAssignments[index];
+    this.prizeResultAssignments[index] = this.prizeResultAssignments[index + 1];
+    this.prizeResultAssignments[index + 1] = temp;
+
+    // Save to localStorage
+    localStorage.setItem(
+      "prizeResultAssignments",
+      JSON.stringify(this.prizeResultAssignments),
+    );
+
+    // Re-render
+    this.renderPrizeAssignmentUI();
+    console.log(
+      `✓ Moved assignment down from position ${index} to ${index + 1}`,
+    );
   }
 
   applyPrizeResultAssignment() {
@@ -2279,7 +2360,13 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     const bgType = document.getElementById("resultBgType").value;
     const bgColor = document.getElementById("resultBgColor").value;
     const bgImage = localStorage.getItem("resultPanelBackgroundImage");
-    const prizeTitle = this.currentScriptPrizeName || "Kết quả"; // Use current script prize name
+
+    // Get prize title from input field or use current script prize name
+    const prizeTitleInput = document.getElementById("prizeTitleInput");
+    const prizeTitle = prizeTitleInput
+      ? prizeTitleInput.value.trim()
+      : this.currentScriptPrizeName || "Kết quả";
+
     const prizeNames = {}; // Not used anymore
 
     // Get layout settings
@@ -4860,6 +4947,13 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
           if (this.raceMode === "topN") {
             if (!this.currentRaceWinners) this.currentRaceWinners = [];
 
+            // Get prize name based on winner position (index in currentRaceWinners)
+            const winnerIndex = this.currentRaceWinners.length;
+            const prizeName =
+              this.prizeRaceList && this.prizeRaceList[winnerIndex]
+                ? this.prizeRaceList[winnerIndex]
+                : this.currentScriptPrizeName || "";
+
             this.currentRaceWinners.push({
               id: duck.id,
               name: duck.name,
@@ -4867,7 +4961,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
               iconSrc: duck.iconSrc,
               finishTime: duck.finishTime,
               position: duck.position,
-              prizeName: this.currentScriptPrizeName || "", // Add prizeName from script
+              prizeName: prizeName, // Prize name based on winner position
             });
 
             console.log(
@@ -6820,6 +6914,13 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
           data: {},
         });
         console.log("📤 Sent RESET_HISTORY to display");
+
+        // Send message to force close display tab
+        this.displayChannel.postMessage({
+          type: "FORCE_CLOSE_DISPLAY",
+          data: {},
+        });
+        console.log("📤 Sent FORCE_CLOSE_DISPLAY to display");
       }
 
       // Đóng popup victory nếu còn hiển thị
