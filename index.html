@@ -884,130 +884,161 @@
               </div>
             </div>
             <!-- Result Panel Background Settings -->
-            <!-- <div
+            <div
               class="main-panel-background-settings"
               style="font-size: 14px; color: #fff; margin: 20px 0 10px 0"
             >
-              Background Settings
-
-              <div class="input-group">
-                <label for="resultBgType">Background Type:</label>
-                <select
-                  id="resultBgType"
-                  onchange="game.toggleResultBackground()"
-                >
-                  <option value="default">Default</option>
-                  <option value="color">Solid Color</option>
-                  <option value="image">Custom Image</option>
-                </select>
-              </div>
-
-              <div
-                class="input-group"
-                id="resultBgColorGroup"
-                style="display: none"
-              >
-                <label for="resultBgColor">Background Color:</label>
-                <input type="color" id="resultBgColor" value="#1a1a2e" />
-              </div>
-
-              <div
-                class="input-group"
-                id="resultBgImageGroup"
-                style="display: none"
-              >
-                <label for="resultBgImage">Background Image:</label>
-                <input
-                  type="file"
-                  id="resultBgImage"
-                  accept="image/*"
-                  onchange="game.loadResultBackgroundImage(event)"
-                />
-                <small style="color: #888">Upload JPG, PNG, or GIF</small>
-              </div>
-
               <div
                 style="
-                  margin-top: 15px;
-                  padding: 10px;
-                  background: rgba(102, 126, 234, 0.1);
-                  border-radius: 5px;
+                  display: flex;
+                  justify-content: center;
+                  margin-bottom: 10px;
                 "
               >
-                <h4 style="color: #667eea; font-size: 16px; margin: 0 0 10px 0">
-                  📐 Layout Settings
-                </h4>
-                <div
-                  style="
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 10px;
-                  "
+                <button
+                  class="btn btn-small"
+                  onclick="game.toggleBackgroundSettings()"
+                  style="background: #ff9f40; width: auto"
                 >
-                  <div style="display: flex; flex-direction: column; gap: 5px">
-                    <label style="font-size: 14px; color: #fff"
-                      >Winners Grid Width:</label
-                    >
-                    <div style="display: flex; align-items: center; gap: 8px">
-                      <input
-                        type="range"
-                        id="winnersGridWidth"
-                        min="70"
-                        max="100"
-                        value="95"
-                        style="flex: 1"
-                      />
-                      <span
-                        id="winnersGridWidthValue"
-                        style="min-width: 40px; font-size: 14px; color: #667eea"
-                        >95%</span
-                      >
-                    </div>
-                  </div>
-                  <div style="display: flex; flex-direction: column; gap: 5px">
-                    <label style="font-size: 14px; color: #fff"
-                      >Card Gap:</label
-                    >
-                    <div style="display: flex; align-items: center; gap: 8px">
-                      <input
-                        type="range"
-                        id="cardGap"
-                        min="0.5"
-                        max="3"
-                        step="0.5"
-                        value="1.5"
-                        style="flex: 1"
-                      />
-                      <span
-                        id="cardGapValue"
-                        style="min-width: 40px; font-size: 14px; color: #667eea"
-                        >1.5%</span
-                      >
-                    </div>
-                  </div>
-                </div>
-                <small style="color: #888; margin-top: 8px; display: block"
-                  >Adjust race track dimensions and winner card layout</small
-                >
+                  🎨 Background Settings
+                </button>
               </div>
 
-              <div class="input-group">
-                <button
-                  class="btn btn-small"
-                  onclick="game.applyResultPanelSettings()"
-                  style="background: #667eea; margin-right: 10px"
+              <div id="backgroundSettingsContainer" style="display: none">
+                <div class="input-group">
+                  <label for="resultBgType">Background Type:</label>
+                  <select
+                    id="resultBgType"
+                    onchange="game.toggleResultBackground()"
+                  >
+                    <option value="default">Default</option>
+                    <option value="color">Solid Color</option>
+                    <option value="image">Custom Image</option>
+                  </select>
+                </div>
+
+                <div
+                  class="input-group"
+                  id="resultBgColorGroup"
+                  style="display: none"
                 >
-                  ✓ Apply
-                </button>
-                <button
-                  class="btn btn-small"
-                  onclick="game.resetResultPanelSettings()"
-                  style="background: #888"
+                  <label for="resultBgColor">Background Color:</label>
+                  <input type="color" id="resultBgColor" value="#1a1a2e" />
+                </div>
+
+                <div
+                  class="input-group"
+                  id="resultBgImageGroup"
+                  style="display: none"
                 >
-                  ⟲ Reset
-                </button>
+                  <label for="resultBgImage">Background Image:</label>
+                  <input
+                    type="file"
+                    id="resultBgImage"
+                    accept="image/*"
+                    onchange="game.loadResultBackgroundImage(event)"
+                  />
+                  <small style="color: #888">Upload JPG, PNG, or GIF</small>
+                </div>
+
+                <div
+                  style="
+                    margin-top: 15px;
+                    padding: 10px;
+                    background: rgba(102, 126, 234, 0.1);
+                    border-radius: 5px;
+                  "
+                >
+                  <h4
+                    style="color: #667eea; font-size: 16px; margin: 0 0 10px 0"
+                  >
+                    📐 Layout Settings
+                  </h4>
+                  <div
+                    style="
+                      display: grid;
+                      grid-template-columns: 1fr 1fr;
+                      gap: 10px;
+                    "
+                  >
+                    <div
+                      style="display: flex; flex-direction: column; gap: 5px"
+                    >
+                      <label style="font-size: 14px; color: #fff"
+                        >Winners Grid Width:</label
+                      >
+                      <div style="display: flex; align-items: center; gap: 8px">
+                        <input
+                          type="range"
+                          id="winnersGridWidth"
+                          min="70"
+                          max="100"
+                          value="95"
+                          style="flex: 1"
+                        />
+                        <span
+                          id="winnersGridWidthValue"
+                          style="
+                            min-width: 40px;
+                            font-size: 14px;
+                            color: #667eea;
+                          "
+                          >95%</span
+                        >
+                      </div>
+                    </div>
+                    <div
+                      style="display: flex; flex-direction: column; gap: 5px"
+                    >
+                      <label style="font-size: 14px; color: #fff"
+                        >Card Gap:</label
+                      >
+                      <div style="display: flex; align-items: center; gap: 8px">
+                        <input
+                          type="range"
+                          id="cardGap"
+                          min="0.5"
+                          max="3"
+                          step="0.5"
+                          value="1.5"
+                          style="flex: 1"
+                        />
+                        <span
+                          id="cardGapValue"
+                          style="
+                            min-width: 40px;
+                            font-size: 14px;
+                            color: #667eea;
+                          "
+                          >1.5%</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                  <small style="color: #888; margin-top: 8px; display: block"
+                    >Adjust race track dimensions and winner card layout</small
+                  >
+                </div>
+
+                <div class="input-group">
+                  <button
+                    class="btn btn-small"
+                    onclick="game.applyResultPanelSettings()"
+                    style="background: #667eea; margin-right: 10px"
+                  >
+                    ✓ Apply
+                  </button>
+                  <button
+                    class="btn btn-small"
+                    onclick="game.resetResultPanelSettings()"
+                    style="background: #888"
+                  >
+                    ⟲ Reset
+                  </button>
+                </div>
               </div>
-            </div> -->
+              <!-- end backgroundSettingsContainer -->
+            </div>
             <!-- end layout settings -->
           </div>
           <!-- end main panel settings container -->
