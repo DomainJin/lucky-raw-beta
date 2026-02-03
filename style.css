@@ -66,6 +66,26 @@
       50% 80%;
   }
 }
+
+/* Blinking animation for START button during race */
+@keyframes blinkStartButton {
+  0%,
+  100% {
+    background: linear-gradient(135deg, #27ae60, #2ecc71);
+    box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    background: linear-gradient(135deg, #f39c12, #e74c3c);
+    box-shadow: 0 6px 25px rgba(231, 76, 60, 0.6);
+    transform: scale(1.05);
+  }
+}
+
+.btn-blinking {
+  animation: blinkStartButton 1s ease-in-out infinite;
+}
+
 .control-panel > * {
   position: relative;
   z-index: 1;

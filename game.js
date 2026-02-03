@@ -1488,6 +1488,12 @@ class Game {
     // Reset script to pending
     script.status = "pending";
     delete script.startedAt;
+
+    // Remove blinking effect from START button
+    const startBtn = document.getElementById("controlStartBtn");
+    if (startBtn) {
+      startBtn.classList.remove("btn-blinking");
+    }
     localStorage.setItem("raceScripts", JSON.stringify(this.raceScripts));
 
     // Clear current script prize name
@@ -1586,6 +1592,12 @@ class Game {
     script.startedAt = new Date().toISOString();
     localStorage.setItem("raceScripts", JSON.stringify(this.raceScripts));
     this.renderRaceScripts();
+
+    // Add blinking effect to START button
+    const startBtn = document.getElementById("controlStartBtn");
+    if (startBtn) {
+      startBtn.classList.add("btn-blinking");
+    }
 
     // Reset result assignments to avoid mixing with previous script
     this.prizeResultAssignments = [];
@@ -3629,6 +3641,16 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
 
     // Now actually start the race
     console.log("controlStartRace: Beginning race from control panel");
+
+    // Disable and dim the START button while race is running
+    const startBtn = document.getElementById("controlStartBtn");
+    if (startBtn) {
+      startBtn.classList.remove("btn-blinking");
+      startBtn.disabled = true;
+      startBtn.style.opacity = "0.5";
+      startBtn.textContent = "⏳ Racing...";
+    }
+
     this.proceedWithRaceStart();
   }
 
@@ -6151,6 +6173,15 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     this.raceFinished = true;
     this.raceStarted = false;
 
+    // Re-enable START button and remove blinking effect
+    const startBtn = document.getElementById("controlStartBtn");
+    if (startBtn) {
+      startBtn.classList.remove("btn-blinking");
+      startBtn.disabled = false;
+      startBtn.style.opacity = "1";
+      startBtn.textContent = "🚀 Start";
+    }
+
     // Stop animation interval
     if (this.animationId) {
       clearInterval(this.animationId);
@@ -6930,6 +6961,12 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
 
       this.saveWinners(); // Save empty winners array
       this.prizeResultAssignments = []; // Reset result assignments
+
+      // Remove blinking effect from START button
+      const startBtn = document.getElementById("controlStartBtn");
+      if (startBtn) {
+        startBtn.classList.remove("btn-blinking");
+      }
 
       // Send reset message to display
       if (this.displayChannel && !this.isDisplayMode) {
