@@ -1,21 +1,693 @@
-﻿// Import modules
-import {
-  FINISH_LINE_OFFSET,
-  MINIMUM_PARTICIPANTS,
-  safeElementAction,
-} from "./src/utils/constants.js";
-import { SoundManager } from "./src/audio/SoundManager.js";
-import { Duck } from "./src/entities/Duck.js";
-import { PrizeManager } from "./src/game/PrizeManager.js";
-import { UIManager } from "./src/ui/UIManager.js";
-import { HistoryManager } from "./src/game/HistoryManager.js";
-import { RaceController } from "./src/game/RaceController.js";
-import { FileManager } from "./src/utils/FileManager.js";
-import { ImageLoader } from "./src/utils/ImageLoader.js";
+﻿// Finish line offset - distance from duck center to right edge of 150px icon
+// 75px = half of 150px icon width (center of icon)
+const FINISH_LINE_OFFSET = 75;
 
-console.log(
-  "Modules loaded successfully - using imported SoundManager and Duck classes",
-);
+// Minimum participants required to start/continue a race
+const MINIMUM_PARTICIPANTS = 5;
+
+// Helper function to safely get element and perform action
+function safeElementAction(id, action) {
+  const element = document.getElementById(id);
+  if (element && action) {
+    action(element);
+  }
+  return element;
+}
+
+// Sound system
+class SoundManager {
+  constructor() {
+    this.enabled = true;
+    this.context = null;
+    this.initialized = false;
+    this.raceLoopInterval = null;
+    this.crowdNoiseInterval = null;
+    this.customAudioBuffer = null; // For loaded mp3/wav files
+    this.customAudioSource = null; // Current playing source
+
+    // Audio buffers for different stages
+    this.startAudioBuffer = null; // start.mp3 (3s)
+    this.raceAudioBuffer = null; // race.mp3 (30s)
+    this.endAudioBuffer = null; // end.mp3
+
+    // Audio sources
+    this.startAudioSource = null;
+    this.raceAudioSource = null;
+    this.endAudioSource = null;
+
+    // Load audio files from static folder
+    this.loadStaticAudio();
+  }
+
+  init() {
+    if (this.initialized) return;
+    try {
+      this.context = new (window.AudioContext || window.webkitAudioContext)();
+      this.initialized = true;
+    } catch (e) {
+      console.log("Audio not supported");
+    }
+  }
+
+  // Load audio files from static folder
+  async loadStaticAudio() {
+    if (!this.context) {
+      try {
+        this.context = new (window.AudioContext || window.webkitAudioContext)();
+        this.initialized = true;
+      } catch (e) {
+        console.log("Audio not supported");
+        return;
+      }
+    }
+
+    try {
+      // Load start.mp3
+      const startResponse = await fetch("static/start.mp3");
+      if (startResponse.ok) {
+        const startArrayBuffer = await startResponse.arrayBuffer();
+        this.startAudioBuffer =
+          await this.context.decodeAudioData(startArrayBuffer);
+        console.log(
+          "✅ start.mp3 loaded:",
+          this.startAudioBuffer.duration.toFixed(1) + "s",
+        );
+      }
+    } catch (error) {
+      console.warn("⚠️ Could not load start.mp3:", error.message);
+    }
+
+    try {
+      // Load race.mp3
+      const raceResponse = await fetch("static/race.mp3");
+      if (raceResponse.ok) {
+        const raceArrayBuffer = await raceResponse.arrayBuffer();
+        this.raceAudioBuffer =
+          await this.context.decodeAudioData(raceArrayBuffer);
+        console.log(
+          "✅ race.mp3 loaded:",
+          this.raceAudioBuffer.duration.toFixed(1) + "s",
+        );
+      }
+    } catch (error) {
+      console.warn("⚠️ Could not load race.mp3:", error.message);
+    }
+
+    try {
+      // Load end.mp3
+      const endResponse = await fetch("static/end.mp3");
+      if (endResponse.ok) {
+        const endArrayBuffer = await endResponse.arrayBuffer();
+        this.endAudioBuffer =
+          await this.context.decodeAudioData(endArrayBuffer);
+        console.log(
+          "✅ end.mp3 loaded:",
+          this.endAudioBuffer.duration.toFixed(1) + "s",
+        );
+      }
+    } catch (error) {
+      console.warn("⚠️ Could not load end.mp3:", error.message);
+    }
+  }
+
+  // Load audio file (mp3, wav, ogg)
+  async loadAudioFile(file) {
+    if (!this.initialized) this.init();
+    if (!this.context) {
+      console.error("AudioContext not available");
+      return false;
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const arrayBuffer = e.target.result;
+          this.customAudioBuffer =
+            await this.context.decodeAudioData(arrayBuffer);
+          console.log(
+            "✅ Audio file loaded successfully:",
+            file.name,
+            this.customAudioBuffer.duration + "s",
+          );
+          resolve(true);
+        } catch (error) {
+          console.error("❌ Error decoding audio file:", error);
+          reject(error);
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // Load audio from base64 string (for BroadcastChannel sharing)
+  async loadAudioFromBase64(base64Data, fileName) {
+    if (!this.initialized) this.init();
+    if (!this.context) {
+      console.error("AudioContext not available");
+      return false;
+    }
+
+    try {
+      // Convert base64 to ArrayBuffer
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      this.customAudioBuffer = await this.context.decodeAudioData(bytes.buffer);
+      console.log(
+        "✅ Audio loaded from base64:",
+        fileName,
+        this.customAudioBuffer.duration + "s",
+      );
+      return true;
+    } catch (error) {
+      console.error("❌ Error decoding base64 audio:", error);
+      return false;
+    }
+  }
+
+  // Clear custom audio and return to default
+  clearCustomAudio() {
+    console.log("🗑️ Clearing custom audio buffer");
+
+    // Stop custom audio if playing
+    if (this.customAudioSource) {
+      try {
+        this.customAudioSource.stop();
+      } catch (e) {}
+      this.customAudioSource = null;
+    }
+
+    // Clear buffer
+    this.customAudioBuffer = null;
+
+    console.log("✓ Custom audio cleared, will use default race audio");
+  }
+
+  playStartSound() {
+    if (!this.enabled || !this.initialized) return;
+
+    // Play start.mp3 if loaded
+    if (this.startAudioBuffer && this.context) {
+      // Stop previous start sound if playing
+      if (this.startAudioSource) {
+        try {
+          this.startAudioSource.stop();
+        } catch (e) {}
+      }
+
+      this.startAudioSource = this.context.createBufferSource();
+      this.startAudioSource.buffer = this.startAudioBuffer;
+      this.startAudioSource.connect(this.context.destination);
+      this.startAudioSource.start(0);
+      console.log("🔊 Playing start.mp3 (3s countdown)");
+    } else {
+      // Fallback: Horn sound - trumpet style
+      this.playBeep(500, 0.15, 0.3);
+      setTimeout(() => this.playBeep(600, 0.15, 0.3), 100);
+      setTimeout(() => this.playBeep(700, 0.2, 0.5), 200);
+    }
+  }
+
+  playCrowdCheer() {
+    if (!this.enabled || !this.initialized) return;
+    // Victory crowd sound
+    for (let i = 0; i < 10; i++) {
+      setTimeout(() => {
+        this.playBeep(300 + Math.random() * 500, 0.08, 0.15);
+      }, i * 80);
+    }
+  }
+
+  playFinishSound() {
+    if (!this.enabled || !this.initialized) return;
+
+    // Stop race audio first
+    this.stopRacingAmbiance();
+
+    // Play end.mp3 if loaded
+    if (this.endAudioBuffer && this.context) {
+      // Stop previous end sound if playing
+      if (this.endAudioSource) {
+        try {
+          this.endAudioSource.stop();
+        } catch (e) {}
+      }
+
+      this.endAudioSource = this.context.createBufferSource();
+      this.endAudioSource.buffer = this.endAudioBuffer;
+      this.endAudioSource.connect(this.context.destination);
+      this.endAudioSource.start(0);
+      console.log("🔊 Playing end.mp3 (victory sound)");
+    } else {
+      // Fallback: Victory fanfare
+      this.playBeep(1000, 0.15, 0.2);
+      setTimeout(() => this.playBeep(1200, 0.15, 0.2), 150);
+      setTimeout(() => this.playBeep(1500, 0.2, 0.4), 300);
+
+      // Add crowd cheer
+      setTimeout(() => this.playCrowdCheer(), 200);
+    }
+  }
+
+  // Horse galloping sound effect
+  playHorseGallop() {
+    if (!this.enabled || !this.initialized) return;
+    // Simulate horse hooves - 4 beats in quick succession
+    const hoofFreq = 180;
+    const beatDelay = 80;
+
+    for (let i = 0; i < 4; i++) {
+      setTimeout(() => {
+        this.playNoise(hoofFreq + Math.random() * 40, 0.08, 0.05);
+      }, i * beatDelay);
+    }
+  }
+
+  // Start continuous racing ambiance
+  startRacingAmbiance(raceDuration = 30) {
+    if (!this.enabled || !this.initialized) return;
+
+    // Priority 1: Use custom audio if loaded
+    if (this.customAudioBuffer) {
+      console.log("🎵 Using custom audio instead of default race audio");
+      this.playCustomAudio();
+      return;
+    }
+
+    // Priority 2: Play race.mp3 if loaded
+    if (this.raceAudioBuffer && this.context) {
+      // Stop previous race sound if playing
+      if (this.raceAudioSource) {
+        try {
+          this.raceAudioSource.stop();
+        } catch (e) {}
+      }
+
+      this.raceAudioSource = this.context.createBufferSource();
+      this.raceAudioSource.buffer = this.raceAudioBuffer;
+      this.raceAudioSource.connect(this.context.destination);
+
+      // Loop if race duration > audio duration
+      const raceAudioDuration = this.raceAudioBuffer.duration;
+      const audioName = "default race audio";
+      if (raceDuration > raceAudioDuration) {
+        this.raceAudioSource.loop = true;
+        console.log(
+          `🔊 Playing ${audioName} in LOOP (race duration: ${raceDuration}s)`,
+        );
+      } else {
+        this.raceAudioSource.loop = false;
+        console.log(
+          `🔊 Playing ${audioName} once (race duration: ${raceDuration}s)`,
+        );
+      }
+
+      this.raceAudioSource.start(0);
+      return;
+    }
+
+    // Priority 3: Fallback to procedural sounds
+    // Horse galloping loop - continuous hooves sound
+    this.raceLoopInterval = setInterval(() => {
+      // Multiple horses galloping
+      for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+          this.playHorseGallop();
+        }, i * 100);
+      }
+    }, 600);
+
+    // Background crowd noise
+    this.crowdNoiseInterval = setInterval(() => {
+      // Random crowd murmur
+      for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+          this.playBeep(200 + Math.random() * 300, 0.02, 0.3);
+        }, Math.random() * 500);
+      }
+    }, 800);
+  }
+
+  // Play custom loaded audio in loop
+  playCustomAudio() {
+    if (!this.customAudioBuffer || !this.context) return;
+
+    // Stop previous source if exists
+    if (this.customAudioSource) {
+      this.customAudioSource.stop();
+    }
+
+    this.customAudioSource = this.context.createBufferSource();
+    this.customAudioSource.buffer = this.customAudioBuffer;
+    this.customAudioSource.loop = true; // Loop the audio
+    this.customAudioSource.connect(this.context.destination);
+    this.customAudioSource.start(0);
+    console.log("🔊 Playing custom audio in loop");
+  }
+
+  // Stop racing ambiance
+  stopRacingAmbiance() {
+    // Stop race audio if playing
+    if (this.raceAudioSource) {
+      try {
+        this.raceAudioSource.stop();
+        console.log("🔇 Stopped race audio");
+      } catch (e) {}
+      this.raceAudioSource = null;
+    }
+
+    if (this.raceLoopInterval) {
+      clearInterval(this.raceLoopInterval);
+      this.raceLoopInterval = null;
+    }
+    if (this.crowdNoiseInterval) {
+      clearInterval(this.crowdNoiseInterval);
+      this.crowdNoiseInterval = null;
+    }
+    // Stop custom audio if playing
+    if (this.customAudioSource) {
+      try {
+        this.customAudioSource.stop();
+      } catch (e) {}
+      this.customAudioSource = null;
+    }
+  }
+
+  playBeep(frequency, volume, duration) {
+    if (!this.context) return;
+    const oscillator = this.context.createOscillator();
+    const gainNode = this.context.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(this.context.destination);
+
+    oscillator.frequency.value = frequency;
+    oscillator.type = "sine";
+
+    gainNode.gain.setValueAtTime(volume, this.context.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(
+      0.01,
+      this.context.currentTime + duration,
+    );
+
+    oscillator.start(this.context.currentTime);
+    oscillator.stop(this.context.currentTime + duration);
+  }
+
+  // Noise generator for hoof sounds
+  playNoise(frequency, volume, duration) {
+    if (!this.context) return;
+    const oscillator = this.context.createOscillator();
+    const gainNode = this.context.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(this.context.destination);
+
+    oscillator.frequency.value = frequency;
+    oscillator.type = "square"; // Square wave for percussive hoof sound
+
+    gainNode.gain.setValueAtTime(volume, this.context.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(
+      0.01,
+      this.context.currentTime + duration,
+    );
+
+    oscillator.start(this.context.currentTime);
+    oscillator.stop(this.context.currentTime + duration);
+  }
+
+  setEnabled(enabled) {
+    this.enabled = enabled;
+    if (!enabled) {
+      this.stopRacingAmbiance();
+    }
+  }
+}
+
+// Duck class with color and advanced animation
+class Duck {
+  constructor(id, trackLength, name = null) {
+    this.id = id;
+    this.name = name || `Racer #${id}`;
+    this.position = 0;
+    this.speed = 0;
+    this.baseSpeed = Math.random() * 0.8 + 3.2;
+    this.acceleration = 0;
+    this.maxSpeed = this.baseSpeed * 2.0;
+    this.minSpeed = this.baseSpeed * 0.3;
+    this.trackLength = trackLength;
+    this.finished = false;
+    this.finishTime = null;
+    this.color = this.generateColor();
+    this.wobbleOffset = Math.random() * Math.PI * 2;
+    this.previousPosition = 0;
+    this.previousRank = 0;
+    // Timers now in milliseconds for delta time
+    this.speedChangeTimer = 0;
+    this.speedChangeInterval = 500 + Math.random() * 500; // 500-1000ms
+    this.targetSpeed = this.baseSpeed;
+    this.particles = [];
+    this.turboActive = false;
+    this.turboTimer = 0;
+    this.turboDuration = 833; // ~50 frames at 60fps = 833ms
+    this.wingFlapSpeed = 1;
+    this.targetWingFlapSpeed = 1; // Target for smooth wing flap transitions
+    this.laneOffset = 0;
+    this.targetLaneOffset = 0;
+    this.laneChangeTimer = 0;
+    this.laneChangeInterval = 2000; // 2 seconds
+    this.currentFrame = 0;
+    this.lastFrameTime = 0;
+    this.animationFPS = 20; // Increased from 12 to 20 FPS for smoother animation
+
+    // Lane management for finish line collision avoidance
+    this.lane = Math.floor(Math.random() * 5); // 0-4: 5 lanes for smoother transitions
+    this.preferredLane = this.lane;
+    this.laneChangeSpeed = 0.05; // Smooth lane transitions
+    this.lastLaneChangeTime = 0; // Timestamp of last lane change
+    this.laneChangeCooldown = 1000; // 1 second cooldown between lane changes
+  }
+
+  generateColor() {
+    const colors = [
+      "#FFD700",
+      "#FF6B6B",
+      "#4ECDC4",
+      "#45B7D1",
+      "#FFA07A",
+      "#98D8C8",
+      "#F7DC6F",
+      "#BB8FCE",
+      "#85C1E2",
+      "#F8B739",
+      "#52B788",
+      "#E63946",
+      "#457B9D",
+      "#E76F51",
+      "#2A9D8F",
+      "#FF1493",
+      "#00CED1",
+      "#FF4500",
+      "#32CD32",
+      "#BA55D3",
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  }
+
+  randomizeSpeed() {
+    this.speed = this.baseSpeed;
+    this.targetSpeed = this.baseSpeed;
+  }
+
+  update(
+    time,
+    currentRank,
+    totalDucks,
+    deltaTime = 1.0,
+    inSlowdownZone = false,
+  ) {
+    this.previousPosition = this.position;
+    if (!this.finished) {
+      // Lane changing logic (time-based)
+      this.laneChangeTimer -= 16.67 * deltaTime; // deltaTime normalized to 60fps frame time
+      if (this.laneChangeTimer <= 0 && Math.random() > 0.85) {
+        this.laneChangeTimer = this.laneChangeInterval + Math.random() * 2000; // 2000-4000ms
+        this.targetLaneOffset = (Math.random() - 0.5) * 40;
+      }
+
+      // Smooth lane transition
+      this.laneOffset +=
+        (this.targetLaneOffset - this.laneOffset) * 0.05 * deltaTime;
+
+      // Smooth wing flap speed transition (reduced from instant to gradual)
+      this.wingFlapSpeed +=
+        (this.targetWingFlapSpeed - this.wingFlapSpeed) * 0.1;
+
+      // Animation frame update với FPS cố định 20 (increased for smoother motion)
+      const currentTime = Date.now();
+      const frameInterval = 1000 / this.animationFPS; // ~50ms cho 20 FPS
+      if (currentTime - this.lastFrameTime >= frameInterval) {
+        this.lastFrameTime = currentTime;
+        this.currentFrame = (this.currentFrame + 1) % 3; // Cycle through 0, 1, 2
+      }
+
+      // Speed change with rubber banding (time-based)
+      this.speedChangeTimer -= 16.67 * deltaTime;
+      if (this.speedChangeTimer <= 0) {
+        this.speedChangeTimer = this.speedChangeInterval;
+        const rand = Math.random();
+
+        // Strong rubber banding: leaders very likely to slow down
+        const isLeader = currentRank === 1;
+        const isTop3 = currentRank <= 3;
+        const isTop10 = currentRank <= 10;
+        const isLagging = currentRank > totalDucks * 0.5;
+
+        // Leader (rank 1) has 60% chance to slow down
+        const slowDownChance = isLeader
+          ? 0.6
+          : isTop3
+            ? 0.45
+            : isTop10
+              ? 0.25
+              : 0.1;
+        // Leader has only 5% turbo chance, laggers have 25% chance
+        const turboChance = isLeader
+          ? 0.95
+          : isTop3
+            ? 0.85
+            : isTop10
+              ? 0.75
+              : isLagging
+                ? 0.7
+                : 0.8;
+
+        if (rand > turboChance) {
+          // Extreme turbo boost - stronger for laggers
+          const boostMultiplier = isLagging ? 1.8 : 1.4;
+          this.targetSpeed =
+            this.maxSpeed * (boostMultiplier + Math.random() * 0.5);
+          this.turboActive = true;
+          this.turboTimer = this.turboDuration; // 833ms (~50 frames at 60fps)
+          this.targetWingFlapSpeed = 3; // Smooth transition to fast flap
+        } else if (rand > 0.6) {
+          // Fast speed
+          this.targetSpeed = this.baseSpeed * (1.5 + Math.random() * 0.7);
+          this.targetWingFlapSpeed = 2; // Smooth transition
+        } else if (rand < slowDownChance) {
+          // Sudden slowdown - more severe for leaders
+          const slowMultiplier = isLeader ? 0.2 : isTop3 ? 0.4 : 0.6;
+          this.targetSpeed =
+            this.minSpeed * (slowMultiplier + Math.random() * 0.2);
+          this.targetWingFlapSpeed = 0.5; // Smooth transition (increased from 0.2)
+        } else {
+          // Normal speed with variation
+          this.targetSpeed = this.baseSpeed * (0.7 + Math.random() * 0.6);
+          this.targetWingFlapSpeed = 1; // Smooth transition
+        }
+      }
+
+      if (this.turboActive) {
+        this.turboTimer -= 16.67 * deltaTime;
+        if (this.turboTimer <= 0) {
+          this.turboActive = false;
+        }
+        if (Math.random() > 0.7) {
+          this.particles.push({
+            x: this.position,
+            y: 0,
+            vx: (-2 - Math.random() * 2) * deltaTime,
+            vy: (Math.random() - 0.5) * 2 * deltaTime,
+            life: 20,
+            maxLife: 20,
+          });
+        }
+      }
+
+      // Check if approaching finish line - only slow down in the last 50px to avoid overshooting
+      const distanceToFinish =
+        this.trackLength - FINISH_LINE_OFFSET - this.position;
+      const decelerationZone = 50;
+
+      if (distanceToFinish <= decelerationZone && distanceToFinish > 0) {
+        // Gradually slow down as approaching finish line
+        const slowdownFactor = distanceToFinish / decelerationZone;
+        this.targetSpeed = this.baseSpeed * slowdownFactor * 0.5;
+      }
+
+      // Smooth acceleration - REDUCED for ultra-smooth movement
+      // Lower value = slower speed transitions = smoother camera tracking
+      this.acceleration = (this.targetSpeed - this.speed) * 0.05; // Reduced from 0.15 to 0.05
+      this.speed += this.acceleration;
+      this.speed = Math.max(
+        this.minSpeed,
+        Math.min(this.maxSpeed * 1.7, this.speed),
+      );
+
+      // Boost speed when camera/background are stopping (inSlowdownZone) to maintain visual motion
+      let speedMultiplier = 1.0;
+      if (inSlowdownZone) {
+        // Increase multiplier as camera slows down (1.0 to 1.8x) - reduced for smoother motion
+        const leader = this.trackLength - this.position;
+        const slowdownProgress = Math.max(0, Math.min(1, (500 - leader) / 500)); // 0 at 500px, 1 at finish
+        speedMultiplier = 1.0 + slowdownProgress * 0.8; // Gradually increase from 1.0x to 1.8x
+      }
+
+      // Position movement normalized to 60 FPS - removed random jitter for smooth motion
+      this.position += this.speed * deltaTime * speedMultiplier;
+
+      // Update particles (time-based)
+      this.particles = this.particles.filter((p) => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life--;
+        return p.life > 0;
+      });
+
+      // Visual duck center is ~FINISH_LINE_OFFSET px before the right edge of 150px icon
+      // Allow duck to pass finish line and continue with deceleration (inertia)
+      if (
+        this.position >= this.trackLength - FINISH_LINE_OFFSET &&
+        !this.finished
+      ) {
+        this.finished = true;
+        this.finishTime = Date.now();
+        // Don't stop immediately - let duck continue with gradual slowdown for realism
+        // Set target speed to slowly decelerate
+        this.targetSpeed = this.speed * 0.3; // Reduce to 30% of current speed
+      }
+
+      // Continue moving even after finishing (with deceleration) for visual realism
+      // Will be stopped by race end logic in animate()
+    } else {
+      // Duck has finished - continue with gradual deceleration
+      this.speed *= 0.95; // Gradually slow down (95% each frame)
+      if (this.speed > 0.1) {
+        this.position += this.speed * deltaTime;
+      }
+    }
+  }
+
+  getWobble(time) {
+    // WOBBLE COMPLETELY DISABLED - causes violent shaking when camera moves
+    return 0;
+  }
+
+  getSpeedIndicator() {
+    const speedPercent = this.speed / this.maxSpeed;
+    if (this.turboActive) return "🔥";
+    if (speedPercent > 0.8) return "⚡";
+    if (speedPercent < 0.4) return "💤";
+    return "";
+  }
+}
+
+console.log("Classes loaded successfully");
 
 // Game class with all features
 class Game {
@@ -49,21 +721,21 @@ class Game {
     this.raceDuration = 30;
     this.gameSpeed = 1.0; // Game speed multiplier: 0.25x to 3x
     this.raceMode = "topN"; // Always use topN mode with variable winner count
-    this.winnerCount = 3; // For topN mode
+    this.winnerCount = null; // Will be set by race script only - no default
     this.winners = []; // Array to store accumulated winners across races
     this.currentRaceWinners = []; // Array to store winners for current race only (topN mode)
 
-    // Prize management - Delegate to PrizeManager
-    this.prizeManager = new PrizeManager();
+    // Prize management - separate for race and result
+    this.prizeRaceList =
+      JSON.parse(localStorage.getItem("prizeRaceList")) || [];
+    this.prizeResultAssignments =
+      JSON.parse(localStorage.getItem("prizeResultAssignments")) || [];
+    this.usedPrizesCount =
+      parseInt(localStorage.getItem("usedPrizesCount")) || 0; // Track số giải đã trao
 
-    // Keep references for backward compatibility
-    this.prizeRaceList = this.prizeManager.prizeRaceList;
-    this.prizeResultAssignments = this.prizeManager.prizeResultAssignments;
-    this.usedPrizesCount = this.prizeManager.usedPrizesCount;
-    this.raceScripts = this.prizeManager.raceScripts;
-
-    // UI management - Delegate to UIManager
-    this.uiManager = new UIManager(this);
+    // Race Scripts Management - Each script represents one race session
+    this.raceScripts = JSON.parse(localStorage.getItem("raceScripts")) || [];
+    this.currentScriptPrizeName = null; // Store prize name from current running script
 
     this.trackContainer = null;
     this.duckElements = new Map();
@@ -106,7 +778,7 @@ class Game {
               data: { enabled },
             });
             console.log(
-              "ðŸ“¢ Sound toggle changed:",
+              "📢 Sound toggle changed:",
               enabled,
               "- sent to display",
             );
@@ -135,10 +807,10 @@ class Game {
             console.log("Loading audio file:", file.name);
             try {
               await this.soundManager.loadAudioFile(file);
-              alert("âœ“ Custom sound loaded: " + file.name);
 
               // Share with display.html via BroadcastChannel
               const reader = new FileReader();
+              const self = this; // Save this context
               reader.onload = (e) => {
                 const arrayBuffer = e.target.result;
                 // Convert to base64 for transmission
@@ -149,20 +821,46 @@ class Game {
                   ),
                 );
 
-                if (this.displayChannel) {
-                  this.displayChannel.postMessage({
+                // Save to localStorage so display can load after refresh
+                try {
+                  localStorage.setItem("customAudioData", base64);
+                  localStorage.setItem("customAudioFileName", file.name);
+                  console.log("💾 Custom audio saved to localStorage");
+                } catch (e) {
+                  console.warn("⚠️ Could not save audio to localStorage:", e);
+                }
+
+                if (self.displayChannel) {
+                  self.displayChannel.postMessage({
                     type: "CUSTOM_AUDIO_LOADED",
                     data: {
                       audioData: base64,
                       fileName: file.name,
                     },
                   });
-                  console.log("ðŸ“¢ Custom audio sent to display:", file.name);
+                  console.log("📢 Custom audio sent to display:", file.name);
+                  alert(
+                    "✓ Custom sound loaded: " +
+                      file.name +
+                      "\n\n📺 If display window is already open, please REFRESH it (Ctrl+F5) to apply the new sound!",
+                  );
+                } else {
+                  console.warn(
+                    "⚠️ Display channel not available - display window may not be open",
+                  );
+                  alert(
+                    "✓ Custom sound loaded: " +
+                      file.name +
+                      "\n\n⚠️ Please open Display window to use custom sound!",
+                  );
                 }
+
+                // Update UI to show loaded file
+                self.updateAudioFileStatus(file.name);
               };
               reader.readAsArrayBuffer(file);
             } catch (error) {
-              alert("âŒ Error loading audio file: " + error.message);
+              alert("❌ Error loading audio file: " + error.message);
             }
           });
         }
@@ -208,31 +906,28 @@ class Game {
     this.viewportWidth = 0;
     this.trackHeight = 0;
     this.duckSizeRatio = 0.5; // global ratio: duck height = trackHeight * duckSizeRatio (default 50%)
+    this.isFullscreen = false;
 
-    // Initialize managers
-    this.historyManager = new HistoryManager(this);
-    this.raceController = new RaceController(this);
-    this.fileManager = new FileManager(this);
-    this.imageLoader = new ImageLoader(this);
-
-    this.stats = this.historyManager.loadStats();
+    this.stats = this.loadStats();
+    this.currentRaceNumber = this.stats.totalRaces + 1;
+    // this.highlights = [];
     this.raceHistory = [];
 
     this.duckNames = [];
     this.duckCodes = []; // Store employee codes
-    this.activeDuckNames = []; // Danh sÃ¡ch vá»‹t Ä‘ang tham gia (sáº½ giáº£m dáº§n)
-    this.winners = this.historyManager.loadWinners(); // Danh sách các vịt đã thắng
-    this.winners = this.loadWinners(); // Danh sÃ¡ch cÃ¡c vá»‹t Ä‘Ã£ tháº¯ng
-    this.excludedDucks = []; // Danh sÃ¡ch cÃ¡c vá»‹t bá»‹ loáº¡i
+    this.activeDuckNames = []; // Danh sách vịt đang tham gia (sẽ giảm dần)
+    this.activeDuckCodes = []; // Mã NV tương ứng
+    this.winners = this.loadWinners(); // Danh sách các vịt đã thắng
+    this.excludedDucks = []; // Danh sách các vịt bị loại
 
     this.winnerAnimationFrame = 0;
     this.winnerAnimationInterval = null;
 
-    this.duckImages = []; // Má»—i pháº§n tá»­ sáº½ lÃ  array 3 áº£nh [frame1, frame2, frame3]
-    this.iconCount = 44; // output_3 cÃ³ 44 folders
+    this.duckImages = []; // Mỗi phần tử sẽ là array 3 ảnh [frame1, frame2, frame3]
+    this.iconCount = 44; // output_3 có 44 folders
     this.imagesLoaded = false;
     this.displayIconsLoaded = false; // Track if display has loaded icons
-    this.currentTheme = "output_3"; // Sá»­ dá»¥ng output_3
+    this.currentTheme = "output_3"; // Sử dụng output_3
 
     this.currentTab = "settings"; // Track current tab
 
@@ -269,12 +964,12 @@ class Game {
         return;
       }
       if (type === "DISPLAY_READY") {
-        console.log("âœ… Display window is READY to receive messages");
+        console.log("✅ Display window is READY to receive messages");
         this.displayReady = true;
       } else if (type === "DISPLAY_ICONS_LOADED") {
         const iconCount = data.iconCount || 0;
         console.log(
-          "âœ… Display icons loaded successfully -",
+          "✅ Display icons loaded successfully -",
           iconCount,
           "icons",
         );
@@ -282,7 +977,7 @@ class Game {
         // Only accept if display has actually loaded icons
         if (iconCount === 0) {
           console.warn(
-            "âš ï¸ Display reported icons loaded but iconCount is 0 - ignoring",
+            "⚠️ Display reported icons loaded but iconCount is 0 - ignoring",
           );
           return;
         }
@@ -296,7 +991,7 @@ class Game {
         // Enable Start button ONLY if both control and display have loaded icons
         if (this.imagesLoaded && this.iconCount > 0) {
           console.log(
-            "âœ… Both control (" +
+            "✅ Both control (" +
               this.iconCount +
               ") and display (" +
               iconCount +
@@ -305,7 +1000,7 @@ class Game {
           this.enableStartButton();
         } else {
           console.log(
-            "â³ Control icons not ready yet. Control:",
+            "⏳ Control icons not ready yet. Control:",
             this.imagesLoaded,
             this.iconCount,
           );
@@ -314,14 +1009,14 @@ class Game {
         // Remote toggle from control or display - set local flag
         const enabled = !!(data && data.enabled);
         this.forceClusterCamera = enabled;
-        console.log("ðŸ“¢ FORCE_CLUSTER_CAMERA received - enabled:", enabled);
+        console.log("📢 FORCE_CLUSTER_CAMERA received - enabled:", enabled);
       } else if (type === "DISPLAY_RACE_FINISHED") {
         // Display has detected winner and sent it back
-        console.log("âœ… Received DISPLAY_RACE_FINISHED from display");
+        console.log("✅ Received DISPLAY_RACE_FINISHED from display");
         this.handleDisplayRaceFinished(data);
       } else if (type === "SHOW_RESULTS_ASSIGNED") {
         // Display custom assigned results on display screen
-        console.log("âœ… Received SHOW_RESULTS_ASSIGNED for display");
+        console.log("✅ Received SHOW_RESULTS_ASSIGNED for display");
         this.displayCustomAssignedResults(data);
       }
     };
@@ -336,14 +1031,7 @@ class Game {
     }, 500);
 
     // this.updateStatsDisplay(); // Stats panel removed
-    // Update history after DOM is ready
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", () => {
-        this.updateHistoryWin();
-      });
-    } else {
-      this.updateHistoryWin();
-    }
+    // Don't update history - removed
 
     // Load result panel settings for both control and display mode
     this.loadResultPanelSettings();
@@ -353,6 +1041,11 @@ class Game {
     if (!this.isDisplayMode) {
       this.detectAvailableThemes();
       this.detectAndLoadDuckImages();
+
+      // Update Start button state based on existing scripts
+      setTimeout(() => {
+        this.updateStartButtonState();
+      }, 100);
     } else {
       console.log("Display mode: Loading icons immediately...");
       this.detectAndLoadDuckImages();
@@ -363,12 +1056,12 @@ class Game {
     // Only enable Start Race if both control and display have loaded icons
     if (this.imagesLoaded && this.displayIconsLoaded) {
       console.log(
-        "âœ… Both control and display icons loaded - enabling Start Race",
+        "✅ Both control and display icons loaded - enabling Start Race",
       );
       this.enableStartButton();
     } else {
       console.log(
-        "â³ Waiting for icons... Control:",
+        "⏳ Waiting for icons... Control:",
         this.imagesLoaded,
         "Display:",
         this.displayIconsLoaded,
@@ -409,6 +1102,11 @@ class Game {
 
   // Result Panel Appearance Settings
   getPrizeTitle() {
+    // First priority: use current script's prize name
+    if (this.currentScriptPrizeName) {
+      return this.currentScriptPrizeName;
+    }
+    // Fallback: use saved title or default
     const savedTitle = localStorage.getItem("customPrizeTitle");
     return savedTitle || "Prize Results";
   }
@@ -417,377 +1115,115 @@ class Game {
     const titleInput = document.getElementById("prizeTitleInput");
     if (titleInput) {
       const title = titleInput.value.trim() || "Prize Results";
-      this.prizeManager.savePrizeTitle(title);
+      localStorage.setItem("customPrizeTitle", title);
     }
   }
 
-  // Prize Name Fields - delegate to PrizeManager
+  // Add a new prize name field
   addPrizeNameField(position = null) {
-    this.prizeManager.addPrizeNameField();
+    const container = document.getElementById("prizeNamesContainer");
+    if (!container) return;
+
+    // If no position specified, find the next position
+    if (position === null) {
+      const existingFields = container.querySelectorAll(".prize-name-field");
+      position = existingFields.length + 1;
+    }
+
+    // Create field HTML
+    const fieldDiv = document.createElement("div");
+    fieldDiv.className = "prize-name-field";
+    fieldDiv.style.cssText = "display: flex; align-items: center; gap: 8px;";
+    fieldDiv.innerHTML = `
+            <label style="min-width: 70px; font-size: 14px; color: #fff;">Prize ${position}:</label>
+            <input type="text" id="prizeName${position}" placeholder="Prize ${position}" maxlength="50" 
+                   style="padding: 5px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; flex: 1; font-size: 13px;"
+                   onchange="game.savePrizeNames()">
+            <button onclick="game.removePrizeNameField(${position})" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px; background: rgba(255,0,0,0.3);">Remove</button>
+        `;
+
+    container.appendChild(fieldDiv);
   }
 
-  removePrizeNameField(fieldId) {
-    this.prizeManager.removePrizeNameField(fieldId);
+  // Remove a prize name field
+  removePrizeNameField(position) {
+    const container = document.getElementById("prizeNamesContainer");
+    if (!container) return;
+
+    const fields = Array.from(container.querySelectorAll(".prize-name-field"));
+    if (fields.length <= 1) {
+      alert("Must keep at least one prize name field!");
+      return;
+    }
+
+    // Remove the field
+    const field = fields.find((f) => f.querySelector(`#prizeName${position}`));
+    if (field) {
+      field.remove();
+    }
+
+    // Save after removing
+    this.savePrizeNames();
   }
 
-  sortPrizeNames(direction) {
-    this.prizeManager.sortPrizeNames(direction);
+  // Sort prize names (ascending 1,2,3... or descending N...3,2,1)
+  sortPrizeNames(order = "asc") {
+    const container = document.getElementById("prizeNamesContainer");
+    if (!container) return;
+
+    // Get all prize fields with their data
+    const fields = Array.from(container.querySelectorAll(".prize-name-field"));
+    const prizeData = fields.map((field) => {
+      const input = field.querySelector('input[id^="prizeName"]');
+      const position = parseInt(input.id.replace("prizeName", ""));
+      return {
+        position: position,
+        value: input.value.trim(),
+      };
+    });
+
+    // Sort by position
+    prizeData.sort((a, b) => {
+      if (order === "asc") {
+        return a.position - b.position;
+      } else {
+        return b.position - a.position;
+      }
+    });
+
+    // Clear container
+    container.innerHTML = "";
+
+    // Re-create fields in sorted order
+    prizeData.forEach((data) => {
+      this.addPrizeNameField(data.position);
+      const input = document.getElementById(`prizeName${data.position}`);
+      if (input && data.value) {
+        input.value = data.value;
+      }
+    });
+
+    // Save sort order to localStorage
+    localStorage.setItem("prizeNamesSortOrder", order);
+
+    console.log(
+      `✓ Prize names sorted ${order === "asc" ? "ascending (1-N)" : "descending (N-1)"}`,
+    );
   }
 
   savePrizeNames() {
-    this.prizeManager.savePrizeNames();
-  }
-
-  getPrizeName(position) {
-    return this.prizeManager.getPrizeName(position);
-  }
-
-  loadPrizeNames() {
-    this.prizeManager.loadPrizeNames();
-  }
-
-  // Prize Race Management - delegate to PrizeManager
-  addPrizeField(type) {
-    if (type === "race") {
-      this.prizeManager.addRacePrizeField();
-      this.syncPrizeReferences();
-    }
-  }
-
-  addPrizeGroup() {
-    const nameInput = document.getElementById("prizeGroupName");
-    const countInput = document.getElementById("prizeGroupCount");
-
-    if (!nameInput || !countInput) {
-      alert("KhÃ´ng tÃ¬m tháº¥y input fields!");
-      return;
-    }
-
-    const prizeName = nameInput.value.trim();
-    const count = parseInt(countInput.value);
-
-    // Validation
-    if (!prizeName) {
-      alert("Vui lÃ²ng nháº­p tÃªn giáº£i!");
-      nameInput.focus();
-      return;
-    }
-
-    if (!count || count < 1) {
-      alert("Sá»‘ ngÆ°á»i pháº£i lá»›n hÆ¡n 0!");
-      countInput.focus();
-      return;
-    }
-
-    if (count > 100) {
-      if (
-        !confirm(
-          `Báº¡n cÃ³ cháº¯c muá»‘n táº¡o ${count} giáº£i? Sá»‘ lÆ°á»£ng khÃ¡ lá»›n.`,
-        )
-      ) {
-        return;
-      }
-    }
-
-    // Add N prizes
-    for (let i = 0; i < count; i++) {
-      this.prizeManager.prizeRaceList.push(prizeName);
-    }
-
-    this.prizeManager.savePrizeRaceList();
-    this.syncPrizeReferences();
-    this.prizeManager.renderPrizeRaceUI();
-
-    // Clear inputs
-    nameInput.value = "";
-    countInput.value = "1";
-    nameInput.focus();
-
-    // Auto-show the prizes list
-    const displayContainer = document.getElementById("racePrizesDisplay");
-    if (displayContainer) {
-      displayContainer.style.display = "block";
-      this.showRacePrizes();
-    }
-
-    alert(
-      `âœ“ ÄÃ£ thÃªm ${count} giáº£i "${prizeName}"!\nTá»•ng sá»‘ giáº£i: ${this.prizeManager.prizeRaceList.length}`,
-    );
-    console.log(`âœ“ Added ${count} prizes:`, prizeName);
-  }
-
-  renderPrizeRaceUI() {
-    this.prizeManager.renderPrizeRaceUI();
-  }
-
-  updatePrizeRaceName(index, value) {
-    this.prizeManager.updateRacePrize(index, value);
-  }
-
-  removePrizeRace(index) {
-    this.prizeManager.removeRacePrize(index);
-    this.syncPrizeReferences();
-  }
-
-  applyPrizeRace() {
-    this.prizeManager.savePrizeRaceList();
-    alert("âœ“ ÄÃ£ Ã¡p dá»¥ng danh sÃ¡ch giáº£i thÆ°á»Ÿng cho cuá»™c Ä‘ua!");
-    console.log("âœ“ Prize race list saved:", this.prizeManager.prizeRaceList);
-  }
-
-  clearAllPrizes() {
-    // Check if any prizes have been awarded
-    if (this.prizeManager.usedPrizesCount > 0) {
-      alert(
-        `KhÃ´ng thá»ƒ xÃ³a táº¥t cáº£ giáº£i vÃ¬ Ä‘Ã£ cÃ³ ${this.prizeManager.usedPrizesCount} giáº£i Ä‘Æ°á»£c trao!\nVui lÃ²ng Reset History trÆ°á»›c.`,
-      );
-      return;
-    }
-
-    if (this.prizeManager.prizeRaceList.length === 0) {
-      alert("Danh sÃ¡ch giáº£i Ä‘ang trá»‘ng!");
-      return;
-    }
-
-    if (
-      !confirm(
-        `Báº¡n cÃ³ cháº¯c muá»‘n xÃ³a táº¥t cáº£ ${this.prizeManager.prizeRaceList.length} giáº£i?`,
-      )
-    ) {
-      return;
-    }
-
-    this.prizeManager.prizeRaceList = [];
-    this.prizeManager.savePrizeRaceList();
-    this.syncPrizeReferences();
-    this.prizeManager.renderPrizeRaceUI();
-
-    alert("âœ“ ÄÃ£ xÃ³a táº¥t cáº£ giáº£i thÆ°á»Ÿng!");
-    console.log("âœ“ Cleared all prizes");
-  }
-
-  // Race Scripts - delegate to PrizeManager
-  addRaceScript() {
-    this.prizeManager.createRaceScript();
-    this.syncPrizeReferences();
-  }
-
-  renderRaceScripts() {
-    this.prizeManager.renderRaceScripts();
-  }
-
-  deleteRaceScript(scriptId) {
-    this.prizeManager.deleteRaceScript(scriptId);
-    this.syncPrizeReferences();
-  }
-
-  markScriptCompleted(scriptId) {
-    this.prizeManager.markScriptCompleted(scriptId);
-  }
-
-  // Result Assignments - delegate to PrizeManager
-  addPrizeAssignmentField() {
-    this.prizeManager.addResultAssignmentField();
-  }
-
-  addPrizeResultGroup() {
-    const nameInput = document.getElementById("prizeResultGroupName");
-    const countInput = document.getElementById("prizeResultGroupCount");
-
-    if (!nameInput || !countInput) {
-      alert("KhÃ´ng tÃ¬m tháº¥y input fields!");
-      return;
-    }
-
-    const prizeName = nameInput.value.trim();
-    const count = parseInt(countInput.value);
-
-    if (!prizeName) {
-      alert("Vui lÃ²ng nháº­p tÃªn giáº£i!");
-      nameInput.focus();
-      return;
-    }
-
-    if (!count || count < 1) {
-      alert("Sá»‘ ngÆ°á»i pháº£i lá»›n hÆ¡n 0!");
-      countInput.focus();
-      return;
-    }
-
-    if (count > 50) {
-      if (
-        !confirm(
-          `Báº¡n cÃ³ cháº¯c muá»‘n táº¡o ${count} hÃ ng gÃ¡n giáº£i? Sá»‘ lÆ°á»£ng khÃ¡ lá»›n.`,
-        )
-      ) {
-        return;
-      }
-    }
-
-    for (let i = 0; i < count; i++) {
-      this.prizeManager.prizeResultAssignments.push({
-        prizeName: prizeName,
-        winnerId: "",
-      });
-    }
-
-    this.syncPrizeReferences();
-    this.prizeManager.renderPrizeAssignmentUI(this.winners);
-
-    nameInput.value = "";
-    countInput.value = "1";
-    nameInput.focus();
-
-    alert(`âœ“ ÄÃ£ thÃªm ${count} hÃ ng gÃ¡n giáº£i "${prizeName}"!`);
-  }
-
-  renderPrizeAssignmentUI() {
-    this.prizeManager.renderPrizeAssignmentUI(this.winners);
-  }
-
-  savePrizeResultAssignments() {
-    this.prizeManager.savePrizeResultAssignments();
-  }
-
-  clearResultAssignments() {
-    this.prizeManager.clearResultAssignments();
-    this.syncPrizeReferences();
-  }
-
-  addBulkResultAssignments() {
-    this.prizeManager.addBulkResultAssignments();
-    this.syncPrizeReferences();
-  }
-
-  // Simplified Prize Methods (legacy)
-  addSimplePrize() {
-    const nameInput = document.getElementById("simplePrizeName");
-    const countInput = document.getElementById("simplePrizeCount");
-
-    if (!nameInput || !countInput) {
-      alert("KhÃ´ng tÃ¬m tháº¥y input fields!");
-      return;
-    }
-
-    const prizeName = nameInput.value.trim();
-    const count = parseInt(countInput.value);
-
-    if (!prizeName) {
-      alert("Vui lÃ²ng nháº­p tÃªn giáº£i!");
-      nameInput.focus();
-      return;
-    }
-
-    if (!count || count < 1) {
-      alert("Sá»‘ ngÆ°á»i pháº£i lá»›n hÆ¡n 0!");
-      countInput.focus();
-      return;
-    }
-
-    if (count > 100) {
-      if (
-        !confirm(
-          `Báº¡n cÃ³ cháº¯c muá»‘n táº¡o ${count} giáº£i? Sá»‘ lÆ°á»£ng khÃ¡ lá»›n.`,
-        )
-      ) {
-        return;
-      }
-    }
-
-    for (let i = 0; i < count; i++) {
-      this.prizeManager.prizeRaceList.push(prizeName);
-    }
-
-    this.winnerCount = this.prizeManager.prizeRaceList.length;
-    const winnerCountInput = document.getElementById("winnerCount");
-    if (winnerCountInput) {
-      winnerCountInput.value = this.winnerCount;
-    }
-
-    this.prizeManager.savePrizeRaceList();
-    this.syncPrizeReferences();
-    this.prizeManager.renderPrizeRaceUI();
-
-    nameInput.value = "";
-    countInput.value = "1";
-    nameInput.focus();
-
-    console.log(
-      `âœ“ Added ${count} prizes: "${prizeName}". Total winners: ${this.winnerCount}`,
-    );
-  }
-
-  renderSimplePrizeUI() {
-    const container = document.getElementById("simplePrizeList");
+    const prizeNames = {};
+    const container = document.getElementById("prizeNamesContainer");
     if (!container) return;
 
-    if (this.prizeManager.prizeRaceList.length === 0) {
-      container.innerHTML =
-        '<i style="color: #888;">ChÆ°a cÃ³ giáº£i nÃ o Ä‘Æ°á»£c thÃªm...</i>';
-      return;
-    }
-
-    let html = `
-      <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #444;">
-        <span style="color: #ffd700;">Tá»•ng sá»‘ giáº£i:</span> <b>${this.prizeManager.prizeRaceList.length}</b> | 
-        <span style="color: #e74c3c;">ÄÃ£ trao:</span> <b>${this.prizeManager.usedPrizesCount}</b> | 
-        <span style="color: #2ecc71;">CÃ²n láº¡i:</span> <b>${this.prizeManager.prizeRaceList.length - this.prizeManager.usedPrizesCount}</b>
-      </div>
-    `;
-
-    this.prizeManager.prizeRaceList.forEach((prize, index) => {
-      const isUsed = index < this.prizeManager.usedPrizesCount;
-      const opacity = isUsed ? "opacity: 0.5;" : "";
-      const status = isUsed ? '<span style="color: #2ecc71;">âœ“</span>' : "";
-
-      html += `
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding: 5px 0; ${opacity}">
-          <span>${index + 1}. <b>${prize}</b> ${status}</span>
-          <button 
-            onclick="game.removeSimplePrize(${index})" 
-            style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size: 16px;"
-            ${isUsed ? 'disabled title="KhÃ´ng thá»ƒ xÃ³a giáº£i Ä‘Ã£ trao"' : ""}
-          >âœ•</button>
-        </div>
-      `;
-    });
-
-    container.innerHTML = html;
-  }
-
-  removeSimplePrize(index) {
-    if (index < this.prizeManager.usedPrizesCount) {
-      alert(
-        "KhÃ´ng thá»ƒ xÃ³a giáº£i Ä‘Ã£ Ä‘Æ°á»£c trao!\nVui lÃ²ng Reset History náº¿u muá»‘n xÃ³a táº¥t cáº£.",
-      );
-      return;
-    }
-
-    if (confirm(`XÃ³a giáº£i "${this.prizeManager.prizeRaceList[index]}"?`)) {
-      this.prizeManager.prizeRaceList.splice(index, 1);
-
-      this.winnerCount = this.prizeManager.prizeRaceList.length;
-      const winnerCountInput = document.getElementById("winnerCount");
-      if (winnerCountInput) {
-        winnerCountInput.value = this.winnerCount;
+    const inputs = container.querySelectorAll('input[id^="prizeName"]');
+    inputs.forEach((input) => {
+      const position = parseInt(input.id.replace("prizeName", ""));
+      if (input.value.trim()) {
+        prizeNames[position] = input.value.trim();
       }
-
-      this.prizeManager.savePrizeRaceList();
-      this.syncPrizeReferences();
-      this.prizeManager.renderPrizeRaceUI();
-
-      console.log(
-        `âœ“ Removed prize at index ${index}. Total winners: ${this.winnerCount}`,
-      );
-    }
-  }
-
-  // Helper: Sync references between Game and PrizeManager
-  syncPrizeReferences() {
-    this.prizeRaceList = this.prizeManager.prizeRaceList;
-    this.prizeResultAssignments = this.prizeManager.prizeResultAssignments;
-    this.usedPrizesCount = this.prizeManager.usedPrizesCount;
-    this.raceScripts = this.prizeManager.raceScripts;
+    });
+    localStorage.setItem("customPrizeNames", JSON.stringify(prizeNames));
   }
 
   getPositionSuffix(pos) {
@@ -846,28 +1282,131 @@ class Game {
     return duck.name;
   }
 
+  loadPrizeNames() {
+    const container = document.getElementById("prizeNamesContainer");
+    if (!container) return;
+
+    // Clear existing fields
+    container.innerHTML = "";
+
+    const savedNames = localStorage.getItem("customPrizeNames");
+    const savedSortOrder = localStorage.getItem("prizeNamesSortOrder") || "asc";
+    let prizeNames = {};
+
+    if (savedNames) {
+      try {
+        prizeNames = JSON.parse(savedNames);
+      } catch (e) {
+        console.error("Failed to parse prize names:", e);
+      }
+    }
+
+    // Get all positions (saved + ensure at least first 3)
+    const positions = Object.keys(prizeNames).map((k) => parseInt(k));
+    const maxPosition = positions.length > 0 ? Math.max(...positions) : 0;
+    const fieldsToShow = Math.max(maxPosition, 3);
+
+    // Create array of positions to display
+    let displayPositions = [];
+    for (let i = 1; i <= fieldsToShow; i++) {
+      displayPositions.push(i);
+    }
+
+    // Sort display order based on saved sort order
+    if (savedSortOrder === "desc") {
+      displayPositions.reverse();
+    }
+
+    // Create fields in sorted order
+    displayPositions.forEach((position) => {
+      this.addPrizeNameField(position);
+      const input = document.getElementById(`prizeName${position}`);
+      if (input && prizeNames[position]) {
+        input.value = prizeNames[position];
+      }
+    });
+
+    // If no fields exist, add at least 3 default fields
+    if (fieldsToShow === 0) {
+      displayPositions = [1, 2, 3];
+      if (savedSortOrder === "desc") {
+        displayPositions.reverse();
+      }
+      displayPositions.forEach((i) => {
+        this.addPrizeNameField(i);
+      });
+    }
+
+    console.log(`✓ Prize names loaded with sort order: ${savedSortOrder}`);
+  }
+
   toggleResultPanelSettings() {
     const container = document.getElementById("resultPanelSettingsContainer");
     if (container) {
-      container.classList.toggle("hidden");
+      if (container.style.display === "none") {
+        container.style.display = "block";
+      } else {
+        container.style.display = "none";
+      }
     }
   }
 
-  // --- RESULT PRIZE ASSIGNMENT (CUSTOM WINNER SELECTION) ---
-  addPrizeAssignmentField() {
-    this.prizeResultAssignments.push({
-      prizeName: "TÃªn giáº£i",
-      winnerId: "",
-    });
-    this.renderPrizeAssignmentUI();
+  // --- RACE PRIZE MANAGEMENT ---
+  addPrizeField(type) {
+    if (type === "race") {
+      this.prizeRaceList.push(`Giải mới ${this.prizeRaceList.length + 1}`);
+      this.renderPrizeRaceUI();
+      this.renderSimplePrizeUI(); // Update simplified UI as well
+      this.renderRaceScripts(); // Update race scripts UI as well
+    }
   }
 
-  addPrizeResultGroup() {
-    const nameInput = document.getElementById("prizeResultGroupName");
-    const countInput = document.getElementById("prizeResultGroupCount");
+  renderPrizeRaceUI() {
+    const container = document.getElementById("prizeNamesRaceContainer");
+    if (!container) return;
+
+    // Also render race scripts UI
+    this.renderRaceScripts();
+
+    // Also render simplified UI
+    this.renderSimplePrizeUI();
+
+    if (this.prizeRaceList.length === 0) {
+      container.innerHTML =
+        '<p style="color: #888; padding: 10px; text-align: center;">Chưa có giải thưởng. Hãy thêm nhóm giải bên trên.</p>';
+      return;
+    }
+
+    container.innerHTML = this.prizeRaceList
+      .map((prize, index) => {
+        const isUsed = index < this.usedPrizesCount;
+        const opacity = isUsed ? "0.5" : "1";
+        const disabled = isUsed ? "disabled" : "";
+        const cursor = isUsed ? "not-allowed" : "pointer";
+        const bgColor = isUsed ? "#1a1a1a" : "#222";
+
+        return `
+        <div style="display: flex; gap: 5px; align-items: center; opacity: ${opacity};">
+            <label style="min-width: 60px; color: ${isUsed ? "#666" : "#ffd700"}; font-weight: bold;">Prize ${index + 1}:</label>
+            <input type="text" value="${prize}" onchange="game.updatePrizeRaceName(${index}, this.value)" 
+                   ${disabled}
+                   style="flex: 1; padding: 5px; background: ${bgColor}; color: white; border: 1px solid #444; border-radius: 3px; cursor: ${isUsed ? "not-allowed" : "text"};">
+            <button onclick="game.removePrizeRace(${index});" 
+                    ${disabled}
+                    style="background:#c0392b; color:white; border:none; padding: 0 10px; border-radius: 3px; cursor: ${cursor}; opacity: ${isUsed ? "0.5" : "1"};">X</button>
+            ${isUsed ? '<span style="color: #27ae60; font-size: 12px; min-width: 80px;">✓ Đã trao</span>' : ""}
+        </div>
+    `;
+      })
+      .join("");
+  }
+
+  addPrizeGroup() {
+    const nameInput = document.getElementById("prizeGroupName");
+    const countInput = document.getElementById("prizeGroupCount");
 
     if (!nameInput || !countInput) {
-      alert("KhÃ´ng tÃ¬m tháº¥y input fields!");
+      alert("Không tìm thấy input fields!");
       return;
     }
 
@@ -876,13 +1415,563 @@ class Game {
 
     // Validation
     if (!prizeName) {
-      alert("Vui lÃ²ng nháº­p tÃªn giáº£i!");
+      alert("Vui lòng nhập tên giải!");
       nameInput.focus();
       return;
     }
 
     if (!count || count < 1) {
-      alert("Sá»‘ ngÆ°á»i pháº£i lá»›n hÆ¡n 0!");
+      alert("Số người phải lớn hơn 0!");
+      countInput.focus();
+      return;
+    }
+
+    if (count > 100) {
+      if (!confirm(`Bạn có chắc muốn tạo ${count} giải? Số lượng khá lớn.`)) {
+        return;
+      }
+    }
+
+    // Add N prizes with same name
+    for (let i = 0; i < count; i++) {
+      this.prizeRaceList.push(prizeName);
+    }
+
+    // Save to localStorage
+    localStorage.setItem("prizeRaceList", JSON.stringify(this.prizeRaceList));
+
+    // Update UI
+    this.renderPrizeRaceUI();
+
+    // Clear inputs
+    nameInput.value = "";
+    countInput.value = "1";
+    nameInput.focus();
+
+    // Auto-show the prizes list
+    const displayContainer = document.getElementById("racePrizesDisplay");
+    if (displayContainer) {
+      displayContainer.style.display = "block";
+      this.showRacePrizes(); // This will populate the content
+    }
+
+    alert(
+      `✓ Đã thêm ${count} giải "${prizeName}"!\nTổng số giải: ${this.prizeRaceList.length}`,
+    );
+    console.log(`✓ Added ${count} prizes:`, prizeName);
+  }
+
+  // Race Scripts Management - Each script represents one race session
+  addRaceScript() {
+    const nameInput = document.getElementById("simplePrizeName");
+    const countInput = document.getElementById("simplePrizeCount");
+
+    if (!nameInput || !countInput) {
+      alert("Không tìm thấy input fields!");
+      return;
+    }
+
+    const prizeName = nameInput.value.trim();
+    const count = parseInt(countInput.value);
+
+    // Validation
+    if (!prizeName) {
+      alert("Vui lòng nhập tên giải!");
+      nameInput.focus();
+      return;
+    }
+
+    if (!count || count < 1) {
+      alert("Số người phải lớn hơn 0!");
+      countInput.focus();
+      return;
+    }
+
+    // Initialize race scripts array if not exists
+    if (!this.raceScripts) {
+      this.raceScripts = JSON.parse(localStorage.getItem("raceScripts")) || [];
+    }
+
+    // Create new race script
+    const script = {
+      id: Date.now(),
+      prizeName: prizeName,
+      winnerCount: count,
+      status: "pending", // pending, running, completed
+      createdAt: new Date().toISOString(),
+    };
+
+    this.raceScripts.push(script);
+    localStorage.setItem("raceScripts", JSON.stringify(this.raceScripts));
+
+    // Update UI
+    this.renderRaceScripts();
+
+    // Clear inputs
+    nameInput.value = "";
+    countInput.value = "1";
+    nameInput.focus();
+
+    console.log(`✓ Created race script:`, script);
+  }
+
+  renderRaceScripts() {
+    const container = document.getElementById("raceScriptsList");
+    if (!container) return;
+
+    if (!this.raceScripts) {
+      this.raceScripts = JSON.parse(localStorage.getItem("raceScripts")) || [];
+    }
+
+    if (this.raceScripts.length === 0) {
+      container.innerHTML =
+        '<i style="color: #888;">Chưa có script nào được tạo...</i>';
+      return;
+    }
+
+    let html = `
+      <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #444;">
+        <span style="color: #ffd700;">Tổng scripts:</span> <b>${this.raceScripts.length}</b> | 
+        <span style="color: #2ecc71;">Pending:</span> <b>${this.raceScripts.filter((s) => s.status === "pending").length}</b> | 
+        <span style="color: #3498db;">Completed:</span> <b>${this.raceScripts.filter((s) => s.status === "completed").length}</b>
+      </div>
+    `;
+
+    this.raceScripts.forEach((script, index) => {
+      const statusColor =
+        script.status === "completed"
+          ? "#2ecc71"
+          : script.status === "running"
+            ? "#e67e22"
+            : "#888";
+      const statusIcon =
+        script.status === "completed"
+          ? "✓"
+          : script.status === "running"
+            ? "▶"
+            : "○";
+      const isRunning = script.status === "running";
+      const isCompleted = script.status === "completed";
+
+      html += `
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding: 8px 0; background: ${isCompleted ? "rgba(46, 204, 113, 0.1)" : "transparent"}; margin: 0 -8px; padding: 8px;">
+          <div style="flex: 1;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: ${statusColor}; font-size: 16px;">${statusIcon}</span>
+              <span style="color: #ffd700; font-weight: bold;">${script.prizeName}</span>
+              <span style="color: #67e8f9; font-size: 12px;">(${script.winnerCount} người)</span>
+            </div>
+            <div style="font-size: 11px; color: #666; margin-top: 2px; margin-left: 24px;">
+              ${new Date(script.createdAt).toLocaleString("vi-VN")}
+            </div>
+          </div>
+          <div style="display: flex; gap: 5px;">
+            <button 
+              onclick="game.${isRunning ? `cancelRunningScript(${script.id})` : `startRaceWithScript(${script.id})`}" 
+              style="
+                background: ${isCompleted ? "#95a5a6" : isRunning ? "#e67e22" : "#27ae60"};
+                border: none;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 5px;
+                cursor: ${isCompleted ? "not-allowed" : "pointer"};
+                font-size: 13px;
+                font-weight: bold;
+              "
+              ${isCompleted ? "disabled" : ""}
+              ${isRunning ? 'title="Click để hủy chọn script này"' : ""}
+            >
+              ${isCompleted ? "✓ Done" : isRunning ? "Running... ✕" : "▶ START"}
+            </button>
+            <button 
+              onclick="game.deleteRaceScript(${script.id})" 
+              style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size: 16px;"
+              ${isRunning ? 'disabled title="Không thể xóa script đang chạy"' : ""}
+            >✕</button>
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+
+    // Update Start button state based on scripts
+    this.updateStartButtonState();
+  }
+
+  // Update Start button state - disable if no running script
+  updateStartButtonState() {
+    if (this.isDisplayMode) return; // Only for control panel
+
+    const controlStartBtn = document.getElementById("controlStartBtn");
+    if (!controlStartBtn) return;
+
+    // Check if there's a running script
+    const hasRunningScript =
+      this.raceScripts && this.raceScripts.some((s) => s.status === "running");
+
+    if (hasRunningScript) {
+      controlStartBtn.disabled = false;
+      controlStartBtn.style.opacity = "1";
+      controlStartBtn.style.cursor = "pointer";
+    } else {
+      controlStartBtn.disabled = true;
+      controlStartBtn.style.opacity = "0.5";
+      controlStartBtn.style.cursor = "not-allowed";
+      controlStartBtn.title = "Vui lòng chọn script để chạy";
+    }
+  }
+
+  // Cancel running script and return to pending state
+  cancelRunningScript(scriptId) {
+    const script = this.raceScripts.find((s) => s.id === scriptId);
+    if (!script) {
+      alert("Không tìm thấy script!");
+      return;
+    }
+
+    if (script.status !== "running") {
+      alert("Script không ở trạng thái running!");
+      return;
+    }
+
+    // Check if race has started
+    if (this.raceStarted && !this.raceFinished) {
+      alert(
+        "⚠️ Không thể hủy script khi đua đang chạy!\n\nVui lòng đợi cuộc đua kết thúc hoặc nhấn Home để dừng.",
+      );
+      return;
+    }
+
+    // Confirm cancellation
+    if (
+      !confirm(
+        `Hủy chọn script "${script.prizeName}"?\n\nScript sẽ trở về trạng thái chờ.`,
+      )
+    ) {
+      return;
+    }
+
+    // Reset script to pending
+    script.status = "pending";
+    delete script.startedAt;
+    localStorage.setItem("raceScripts", JSON.stringify(this.raceScripts));
+
+    // Clear current script prize name
+    this.currentScriptPrizeName = null;
+
+    // Re-render UI
+    this.renderRaceScripts();
+
+    console.log(`✓ Script cancelled and reset to pending:`, script);
+  }
+
+  startRaceWithScript(scriptId) {
+    const script = this.raceScripts.find((s) => s.id === scriptId);
+    if (!script) {
+      alert("Không tìm thấy script!");
+      return;
+    }
+
+    if (script.status === "completed") {
+      alert("Script này đã chạy xong!");
+      return;
+    }
+
+    if (script.status === "running") {
+      alert("Script đang chạy!");
+      return;
+    }
+
+    // Check if another script is already running
+    const runningScript = this.raceScripts.find(
+      (s) => s.status === "running" && s.id !== scriptId,
+    );
+    if (runningScript) {
+      alert(
+        `Có script khác đang chạy: "${runningScript.prizeName}"!\nVui lòng đợi script hiện tại hoàn thành.`,
+      );
+      return;
+    }
+
+    // Set up race with script configuration
+    this.prizeRaceList = Array(script.winnerCount).fill(script.prizeName);
+    this.winnerCount = script.winnerCount;
+    this.usedPrizesCount = 0;
+    this.currentScriptPrizeName = script.prizeName; // Save current script's prize name
+
+    // Update winnerCount input
+    const winnerCountInput = document.getElementById("winnerCount");
+    if (winnerCountInput) {
+      winnerCountInput.value = this.winnerCount;
+    }
+
+    // Save to localStorage - IMPORTANT: save winnerCount to prevent override
+    localStorage.setItem("prizeRaceList", JSON.stringify(this.prizeRaceList));
+    localStorage.setItem("usedPrizesCount", "0");
+    localStorage.setItem("winnerCount", this.winnerCount.toString());
+
+    console.log(
+      `✓ Script config: winnerCount=${this.winnerCount}, prizeName="${script.prizeName}"`,
+    );
+
+    // Mark script as running
+    script.status = "running";
+    script.startedAt = new Date().toISOString();
+    localStorage.setItem("raceScripts", JSON.stringify(this.raceScripts));
+    this.renderRaceScripts();
+
+    // Reset result assignments to avoid mixing with previous script
+    this.prizeResultAssignments = [];
+    localStorage.removeItem("prizeResultAssignments");
+    if (this.renderPrizeAssignmentUI) {
+      this.renderPrizeAssignmentUI();
+    }
+
+    // Start the race
+    this.startRace();
+
+    console.log(`✓ Started race with script:`, script);
+  }
+
+  deleteRaceScript(scriptId) {
+    const script = this.raceScripts.find((s) => s.id === scriptId);
+    if (script && script.status === "running") {
+      alert("Không thể xóa script đang chạy!");
+      return;
+    }
+
+    if (confirm("Xóa script này?")) {
+      this.raceScripts = this.raceScripts.filter((s) => s.id !== scriptId);
+      localStorage.setItem("raceScripts", JSON.stringify(this.raceScripts));
+      this.renderRaceScripts();
+      console.log(`✓ Deleted race script: ${scriptId}`);
+    }
+  }
+
+  markScriptCompleted(scriptId) {
+    const script = this.raceScripts.find((s) => s.id === scriptId);
+    if (script) {
+      script.status = "completed";
+      script.completedAt = new Date().toISOString();
+      localStorage.setItem("raceScripts", JSON.stringify(this.raceScripts));
+      this.renderRaceScripts(); // Re-render UI to show completed status
+      console.log(`✓ Marked script as completed:`, script);
+    }
+  }
+
+  // Simplified prize management functions (legacy - for backward compatibility)
+  addSimplePrize() {
+    const nameInput = document.getElementById("simplePrizeName");
+    const countInput = document.getElementById("simplePrizeCount");
+
+    if (!nameInput || !countInput) {
+      alert("Không tìm thấy input fields!");
+      return;
+    }
+
+    const prizeName = nameInput.value.trim();
+    const count = parseInt(countInput.value);
+
+    // Validation
+    if (!prizeName) {
+      alert("Vui lòng nhập tên giải!");
+      nameInput.focus();
+      return;
+    }
+
+    if (!count || count < 1) {
+      alert("Số người phải lớn hơn 0!");
+      countInput.focus();
+      return;
+    }
+
+    if (count > 100) {
+      if (!confirm(`Bạn có chắc muốn tạo ${count} giải? Số lượng khá lớn.`)) {
+        return;
+      }
+    }
+
+    // Add N prizes with same name
+    for (let i = 0; i < count; i++) {
+      this.prizeRaceList.push(prizeName);
+    }
+
+    // Auto-update winnerCount to match total prizes
+    this.winnerCount = this.prizeRaceList.length;
+    const winnerCountInput = document.getElementById("winnerCount");
+    if (winnerCountInput) {
+      winnerCountInput.value = this.winnerCount;
+    }
+
+    // Save to localStorage
+    localStorage.setItem("prizeRaceList", JSON.stringify(this.prizeRaceList));
+
+    // Update both UIs
+    this.renderPrizeRaceUI();
+    this.renderSimplePrizeUI();
+
+    // Clear inputs
+    nameInput.value = "";
+    countInput.value = "1";
+    nameInput.focus();
+
+    console.log(
+      `✓ Added ${count} prizes: "${prizeName}". Total winners: ${this.winnerCount}`,
+    );
+  }
+
+  renderSimplePrizeUI() {
+    const container = document.getElementById("simplePrizeList");
+    if (!container) return;
+
+    if (this.prizeRaceList.length === 0) {
+      container.innerHTML =
+        '<i style="color: #888;">Chưa có giải nào được thêm...</i>';
+      return;
+    }
+
+    let html = `
+      <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #444;">
+        <span style="color: #ffd700;">Tổng số giải:</span> <b>${this.prizeRaceList.length}</b> | 
+        <span style="color: #e74c3c;">Đã trao:</span> <b>${this.usedPrizesCount}</b> | 
+        <span style="color: #2ecc71;">Còn lại:</span> <b>${this.prizeRaceList.length - this.usedPrizesCount}</b>
+      </div>
+    `;
+
+    this.prizeRaceList.forEach((prize, index) => {
+      const isUsed = index < this.usedPrizesCount;
+      const opacity = isUsed ? "opacity: 0.5;" : "";
+      const status = isUsed ? '<span style="color: #2ecc71;">✓</span>' : "";
+
+      html += `
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding: 5px 0; ${opacity}">
+          <span>${index + 1}. <b>${prize}</b> ${status}</span>
+          <button 
+            onclick="game.removeSimplePrize(${index})" 
+            style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size: 16px;"
+            ${isUsed ? 'disabled title="Không thể xóa giải đã trao"' : ""}
+          >✕</button>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+  }
+
+  removeSimplePrize(index) {
+    // Check if this prize was already awarded
+    if (index < this.usedPrizesCount) {
+      alert(
+        "Không thể xóa giải đã được trao!\nVui lòng Reset History nếu muốn xóa tất cả.",
+      );
+      return;
+    }
+
+    if (confirm(`Xóa giải "${this.prizeRaceList[index]}"?`)) {
+      this.prizeRaceList.splice(index, 1);
+
+      // Update winnerCount
+      this.winnerCount = this.prizeRaceList.length;
+      const winnerCountInput = document.getElementById("winnerCount");
+      if (winnerCountInput) {
+        winnerCountInput.value = this.winnerCount;
+      }
+
+      // Save and update UI
+      localStorage.setItem("prizeRaceList", JSON.stringify(this.prizeRaceList));
+      this.renderPrizeRaceUI();
+      this.renderSimplePrizeUI();
+
+      console.log(
+        `✓ Removed prize at index ${index}. Total winners: ${this.winnerCount}`,
+      );
+    }
+  }
+
+  clearAllPrizes() {
+    // Check if any prizes have been awarded
+    if (this.usedPrizesCount > 0) {
+      alert(
+        `Không thể xóa tất cả giải vì đã có ${this.usedPrizesCount} giải được trao!\nVui lòng Reset History trước.`,
+      );
+      return;
+    }
+
+    if (this.prizeRaceList.length === 0) {
+      alert("Danh sách giải đang trống!");
+      return;
+    }
+
+    if (
+      !confirm(`Bạn có chắc muốn xóa tất cả ${this.prizeRaceList.length} giải?`)
+    ) {
+      return;
+    }
+
+    // Clear all prizes
+    this.prizeRaceList = [];
+    localStorage.setItem("prizeRaceList", JSON.stringify(this.prizeRaceList));
+
+    // Update UI
+    this.renderPrizeRaceUI();
+
+    alert("✓ Đã xóa tất cả giải thưởng!");
+    console.log("✓ Cleared all prizes");
+  }
+
+  updatePrizeRaceName(index, value) {
+    this.prizeRaceList[index] = value;
+    localStorage.setItem("prizeRaceList", JSON.stringify(this.prizeRaceList));
+    console.log(`✓ Updated prize ${index + 1}: "${value}"`);
+  }
+
+  removePrizeRace(index) {
+    if (this.prizeRaceList.length <= 1) {
+      alert("Phải giữ ít nhất 1 giải thưởng!");
+      return;
+    }
+    if (index < this.usedPrizesCount) {
+      alert("Không thể xóa giải đã trao! Vui lòng reset history trước.");
+      return;
+    }
+    this.prizeRaceList.splice(index, 1);
+    this.renderPrizeRaceUI();
+  }
+
+  applyPrizeRace() {
+    localStorage.setItem("prizeRaceList", JSON.stringify(this.prizeRaceList));
+    alert("✓ Đã áp dụng danh sách giải thưởng cho cuộc đua!");
+    console.log("✓ Prize race list saved:", this.prizeRaceList);
+  }
+
+  // --- RESULT PRIZE ASSIGNMENT (CUSTOM WINNER SELECTION) ---
+  addPrizeAssignmentField() {
+    this.prizeResultAssignments.push({ prizeName: "Tên giải", winnerId: "" });
+    this.renderPrizeAssignmentUI();
+  }
+
+  addPrizeResultGroup() {
+    const nameInput = document.getElementById("prizeResultGroupName");
+    const countInput = document.getElementById("prizeResultGroupCount");
+
+    if (!nameInput || !countInput) {
+      alert("Không tìm thấy input fields!");
+      return;
+    }
+
+    const prizeName = nameInput.value.trim();
+    const count = parseInt(countInput.value);
+
+    // Validation
+    if (!prizeName) {
+      alert("Vui lòng nhập tên giải!");
+      nameInput.focus();
+      return;
+    }
+
+    if (!count || count < 1) {
+      alert("Số người phải lớn hơn 0!");
       countInput.focus();
       return;
     }
@@ -890,7 +1979,7 @@ class Game {
     if (count > 50) {
       if (
         !confirm(
-          `Báº¡n cÃ³ cháº¯c muá»‘n táº¡o ${count} hÃ ng gÃ¡n giáº£i? Sá»‘ lÆ°á»£ng khÃ¡ lá»›n.`,
+          `Bạn có chắc muốn tạo ${count} hàng gán giải? Số lượng khá lớn.`,
         )
       ) {
         return;
@@ -910,19 +1999,19 @@ class Game {
     countInput.value = "1";
     nameInput.focus();
 
-    alert(`âœ“ ÄÃ£ thÃªm ${count} hÃ ng gÃ¡n giáº£i "${prizeName}"!`);
-    console.log(`âœ“ Added ${count} result assignment rows:`, prizeName);
+    alert(`✓ Đã thêm ${count} hàng gán giải "${prizeName}"!`);
+    console.log(`✓ Added ${count} result assignment rows:`, prizeName);
   }
 
   clearAllResultAssignments() {
     if (this.prizeResultAssignments.length === 0) {
-      alert("Danh sÃ¡ch gÃ¡n giáº£i Ä‘ang trá»‘ng!");
+      alert("Danh sách gán giải đang trống!");
       return;
     }
 
     if (
       !confirm(
-        `Báº¡n cÃ³ cháº¯c muá»‘n xÃ³a táº¥t cáº£ ${this.prizeResultAssignments.length} hÃ ng gÃ¡n giáº£i?`,
+        `Bạn có chắc muốn xóa tất cả ${this.prizeResultAssignments.length} hàng gán giải?`,
       )
     ) {
       return;
@@ -935,8 +2024,8 @@ class Game {
     // Update UI
     this.renderPrizeAssignmentUI();
 
-    alert("âœ“ ÄÃ£ xÃ³a táº¥t cáº£ hÃ ng gÃ¡n giáº£i!");
-    console.log("âœ“ Cleared all result assignments");
+    alert("✓ Đã xóa tất cả hàng gán giải!");
+    console.log("✓ Cleared all result assignments");
   }
 
   renderPrizeAssignmentUI() {
@@ -953,22 +2042,24 @@ class Game {
       // Add new winners that aren't in the list yet
       this.winners.forEach((winner, index) => {
         if (!existingWinnerIds.has(winner.id)) {
-          const prizeName = this.prizeRaceList[index] || `Giáº£i ${index + 1}`;
-          this.prizeResultAssignments.push({
-            prizeName: prizeName,
-            winnerId: winner.id,
-          });
-          console.log(`âœ“ Added new winner to assignments: ${winner.name}`);
+          const prizeName = this.prizeRaceList[index];
+          if (prizeName) {
+            this.prizeResultAssignments.push({
+              prizeName: prizeName,
+              winnerId: winner.id,
+            });
+            console.log(`✓ Added new winner to assignments: ${winner.name}`);
+          }
         }
       });
 
       // Update prize names for existing assignments to match current prizeRaceList
       this.prizeResultAssignments.forEach((assign, index) => {
-        const newPrizeName = this.prizeRaceList[index] || `Giáº£i ${index + 1}`;
-        if (assign.prizeName !== newPrizeName) {
+        const newPrizeName = this.prizeRaceList[index];
+        if (newPrizeName && assign.prizeName !== newPrizeName) {
           assign.prizeName = newPrizeName;
           console.log(
-            `âœ“ Updated prize name for assignment ${index}: "${newPrizeName}"`,
+            `✓ Updated prize name for assignment ${index}: "${newPrizeName}"`,
           );
         }
       });
@@ -985,12 +2076,12 @@ class Game {
       localStorage.getItem("prizeAssignStates") || "{}",
     );
 
-    // Láº¥y danh sÃ¡ch ngÆ°á»i tháº¯ng tá»« this.winners vá»›i note (váº¯ng) náº¿u unchecked
+    // Lấy danh sách người thắng từ this.winners với note (vắng) nếu unchecked
     const winnerOptions = this.winners
       .map((w, idx) => {
         const winnerId = `winner_${idx}_${w.name}`;
         const isPresent = prizeAssignStates[winnerId] !== false; // Default true if not set
-        const label = `${w.code ? w.code + " - " : ""}${w.name}${!isPresent ? " (váº¯ng)" : ""}`;
+        const label = `${w.code ? w.code + " - " : ""}${w.name}${!isPresent ? " (vắng)" : ""}`;
         return `<option value="${w.id}">${label}</option>`;
       })
       .join("");
@@ -999,13 +2090,13 @@ class Game {
       .map(
         (assign, index) => `
         <div style="display: flex; gap: 10px; align-items: center; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 5px;">
-            <input type="text" placeholder="TÃªn giáº£i" value="${assign.prizeName}" 
+            <input type="text" placeholder="Tên giải" value="${assign.prizeName}" 
                    onchange="game.prizeResultAssignments[${index}].prizeName = this.value"
                    style="flex: 1; padding: 5px; background: #111; color: #ffd700; border: 1px solid #333; border-radius: 3px;">
-            <span style="color: white;">âžœ</span>
+            <span style="color: white;">➜</span>
             <select onchange="game.prizeResultAssignments[${index}].winnerId = this.value"
                     style="flex: 1; padding: 5px; background: #111; color: white; border: 1px solid #333; border-radius: 3px;">
-                <option value="">-- Chá»n ngÆ°á»i nháº­n --</option>
+                <option value="">-- Chọn người nhận --</option>
                 ${winnerOptions}
             </select>
             <button onclick="game.removePrizeAssignment(${index});" 
@@ -1015,7 +2106,7 @@ class Game {
       )
       .join("");
 
-    // Set láº¡i giÃ¡ trá»‹ Ä‘Ã£ chá»n cho cÃ¡c select sau khi render
+    // Set lại giá trị đã chọn cho các select sau khi render
     this.prizeResultAssignments.forEach((assign, index) => {
       const selects = container.querySelectorAll("select");
       if (selects[index]) selects[index].value = assign.winnerId;
@@ -1033,169 +2124,752 @@ class Game {
       JSON.stringify(this.prizeResultAssignments),
     );
 
-    // Hiá»ƒn thá»‹ Result Panel dá»±a trÃªn dá»¯ liá»‡u Ä‘Ã£ gÃ¡n
+    // Hiển thị Result Panel dựa trên dữ liệu đã gán
     this.showFinalAssignedResults();
   }
 
-  // UI Methods - Delegate to UIManager
   showCurrentSettings() {
-    this.uiManager.showCurrentSettings();
+    const duckCount = document.getElementById("duckCount")?.value || "N/A";
+    const raceDuration =
+      document.getElementById("raceDuration")?.value || "N/A";
+    const gameSpeed = document.getElementById("gameSpeed")?.value || "N/A";
+    const duckSizeRatio =
+      document.getElementById("duckSizeRatio")?.value || "N/A";
+    const finishSafeZone =
+      document.getElementById("finishSafeZone")?.value || "N/A";
+    const finishStaggerEnabled = document.getElementById(
+      "finishStaggerToggle",
+    )?.checked;
+    const winnerCount = document.getElementById("winnerCount")?.value || "N/A";
+
+    const settings = `
+═══════════════════════════════════
+       📊 CURRENT RACE SETTINGS
+═══════════════════════════════════
+
+🏁 Race Configuration:
+   • Number of Racers: ${duckCount}
+   • Race Duration: ${raceDuration} seconds
+   • Number of Winners: ${winnerCount}
+
+⚡ Performance:
+   • Game Speed: ${gameSpeed}x
+   • Duck Size: ${duckSizeRatio}%
+
+🎯 Finish Line:
+   • Safe Zone: ${finishSafeZone}px
+   • Finish Stagger: ${finishStaggerEnabled ? "✓ Enabled" : "✗ Disabled"}
+
+🏆 Prizes (Race Auto-Assign):
+   Total: ${this.prizeRaceList.length} prizes
+   Used: ${this.usedPrizesCount} prizes
+${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}. ${p}${i < this.usedPrizesCount ? " ✓" : ""}`).join("\n") : "   (No prizes configured)"}
+
+═══════════════════════════════════
+    `;
+
+    alert(settings);
+    console.log("Current Settings:", {
+      duckCount,
+      raceDuration,
+      gameSpeed,
+      duckSizeRatio,
+      finishSafeZone,
+      finishStaggerEnabled,
+      winnerCount,
+      prizeRaceList: this.prizeRaceList,
+      usedPrizesCount: this.usedPrizesCount,
+    });
   }
 
   showRacePrizes() {
-    this.uiManager.showRacePrizes();
+    const displayContainer = document.getElementById("racePrizesDisplay");
+    const contentDiv = document.getElementById("racePrizesContent");
+
+    if (!displayContainer || !contentDiv) return;
+
+    // Toggle display
+    if (displayContainer.style.display === "none") {
+      // Show the display
+      if (this.prizeRaceList.length === 0) {
+        contentDiv.innerHTML = `<div style="color: #888; font-style: italic;">No race prizes configured yet. Add prizes using the input above.</div>`;
+      } else {
+        let html = `
+          <div style="margin-bottom: 8px;">
+            <span style="color: #ffd700;">Total:</span> ${this.prizeRaceList.length} | 
+            <span style="color: #e74c3c;">Used:</span> ${this.usedPrizesCount} | 
+            <span style="color: #2ecc71;">Available:</span> ${this.prizeRaceList.length - this.usedPrizesCount}
+          </div>
+          <div style="border-top: 1px solid #444; padding-top: 8px;">
+        `;
+
+        this.prizeRaceList.forEach((prize, index) => {
+          const status =
+            index < this.usedPrizesCount
+              ? `<span style="color: #2ecc71;">✓ Awarded</span>`
+              : `<span style="color: #888;">○ Available</span>`;
+          const opacity = index < this.usedPrizesCount ? "opacity: 0.6;" : "";
+          html += `<div style="${opacity} padding: 3px 0;">${index + 1}. ${prize} ${status}</div>`;
+        });
+
+        html += `</div>`;
+        contentDiv.innerHTML = html;
+      }
+      displayContainer.style.display = "block";
+      console.log("Race Prizes shown:", {
+        prizeRaceList: this.prizeRaceList,
+        usedPrizesCount: this.usedPrizesCount,
+        available: this.prizeRaceList.length - this.usedPrizesCount,
+      });
+    } else {
+      // Hide the display
+      displayContainer.style.display = "none";
+    }
   }
 
   showPrizeAssignments() {
-    this.uiManager.showPrizeAssignments();
+    const displayContainer = document.getElementById(
+      "resultAssignmentsDisplay",
+    );
+    const contentDiv = document.getElementById("resultAssignmentsContent");
+
+    if (!displayContainer || !contentDiv) return;
+
+    // Toggle display
+    if (displayContainer.style.display === "none") {
+      // Show the display
+      if (this.prizeResultAssignments.length === 0) {
+        contentDiv.innerHTML = `<div style="color: #888; font-style: italic;">No prize assignments configured yet. Add prizes using the input above.</div>`;
+      } else {
+        let html = `
+          <div style="margin-bottom: 8px;">
+            <span style="color: #667eea;">Total Assignments:</span> ${this.prizeResultAssignments.length}
+          </div>
+          <div style="border-top: 1px solid #444; padding-top: 8px;">
+        `;
+
+        this.prizeResultAssignments.forEach((assign, index) => {
+          const winnerInfo = this.winners.find((w) => w.id == assign.winnerId);
+          const winnerName = winnerInfo
+            ? `${winnerInfo.code ? winnerInfo.code + " - " : ""}${winnerInfo.name}`
+            : `<span style="color: #e74c3c;">(Not selected)</span>`;
+
+          html += `
+            <div style="padding: 5px 0; border-bottom: 1px solid #333;">
+              <div style="color: #ffd700;">${index + 1}. ${assign.prizeName}</div>
+              <div style="padding-left: 15px; color: #67e8f9; font-size: 12px;">→ ${winnerName}</div>
+            </div>
+          `;
+        });
+
+        html += `</div>`;
+        contentDiv.innerHTML = html;
+      }
+      displayContainer.style.display = "block";
+      console.log(
+        "Prize Result Assignments shown:",
+        this.prizeResultAssignments,
+      );
+    } else {
+      // Hide the display
+      displayContainer.style.display = "none";
+    }
   }
 
   showFinalAssignedResults() {
-    this.uiManager.showFinalAssignedResults();
+    const resultPanel = document.getElementById("resultPanel");
+    const resultMessage = document.getElementById("resultMessage");
+    if (!resultPanel || !resultMessage) return;
+
+    resultPanel.classList.remove("hidden");
+
+    let html = `<div class="winners-grid" style="width: 95%; gap: 1.5%;">`;
+
+    this.prizeResultAssignments.forEach((assign, index) => {
+      // Tìm thông tin người thắng dựa trên winnerId đã chọn
+      const winnerInfo = this.winners.find((w) => w.id == assign.winnerId);
+      const displayName = winnerInfo ? winnerInfo.name : "---";
+      const displayCode = winnerInfo && winnerInfo.code ? winnerInfo.code : "";
+
+      html += `
+            <div class="winner-card">
+                <div class="winner-medal">${index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🏅"}</div>
+                <div class="winner-position">${assign.prizeName}</div>
+                <div class="winner-duck-name">${displayCode} ${displayName}</div>
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+    resultMessage.innerHTML = html;
+
+    // Gửi sang màn hình Display
+    if (this.displayChannel) {
+      this.displayChannel.postMessage({
+        type: "SHOW_RESULTS_ASSIGNED",
+        data: {
+          assignments: this.prizeResultAssignments,
+          winners: this.winners,
+        },
+      });
+    }
+
+    alert("✓ Đã cập nhật bảng giải thưởng kết quả!");
+    console.log("✓ Result assignments applied:", this.prizeResultAssignments);
   }
 
   displayCustomAssignedResults(data) {
-    this.uiManager.displayCustomAssignedResults(data);
+    // This function runs on display.html to show custom assigned results
+    if (!this.isDisplayMode) return; // Only run on display
+
+    const resultPanel = document.getElementById("resultPanel");
+    const resultMessage = document.getElementById("resultMessage");
+    if (!resultPanel || !resultMessage) return;
+
+    resultPanel.classList.remove("hidden");
+
+    const assignments = data.assignments || [];
+    const winners = data.winners || [];
+
+    let html = `<div class="winners-grid" style="width: 95%; gap: 1.5%;">`;
+
+    assignments.forEach((assign, index) => {
+      // Find winner info by winnerId
+      const winnerInfo = winners.find((w) => w.id == assign.winnerId);
+      const displayName = winnerInfo ? winnerInfo.name : "---";
+      const displayCode = winnerInfo && winnerInfo.code ? winnerInfo.code : "";
+
+      html += `
+            <div class="winner-card">
+                <div class="winner-medal">${index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🏅"}</div>
+                <div class="winner-position">${assign.prizeName}</div>
+                <div class="winner-duck-name">${displayCode} ${displayName}</div>
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+    resultMessage.innerHTML = html;
+    console.log("✓ Display showing custom assigned results");
   }
 
   applyRaceTrackAspectRatio(width, height) {
-    this.uiManager.applyRaceTrackAspectRatio(width, height);
+    const raceTrack = document.getElementById("raceTrack");
+    const resultPanel = document.getElementById("resultPanel");
+    const victoryPopup = document.getElementById("victoryPopup");
+    const loadingDisplay = document.getElementById("loadingDisplay");
+
+    // Create CSS rule for aspect ratio
+    const styleId = "dynamic-aspect-ratio";
+    let styleEl = document.getElementById(styleId);
+
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = styleId;
+      document.head.appendChild(styleEl);
+    }
+
+    styleEl.textContent = `
+            .race-track {
+                height: calc(100vw * ${height} / ${width}) !important;
+                max-width: calc(100vh * ${width} / ${height}) !important;
+            }
+            .result-panel.fullscreen {
+                height: calc(100vw * ${height} / ${width}) !important;
+                max-width: calc(100vh * ${width} / ${height}) !important;
+            }
+            .victory-popup {
+                height: calc(100vw * ${height} / ${width}) !important;
+                max-width: calc(100vh * ${width} / ${height}) !important;
+            }
+            .loading-display {
+                height: calc(100vw * ${height} / ${width}) !important;
+                max-width: calc(100vh * ${width} / ${height}) !important;
+            }
+        `;
+
+    console.log(`Applied aspect ratio ${width}:${height}`);
   }
 
   toggleResultBackground() {
-    this.uiManager.toggleResultBackground();
+    const bgType = document.getElementById("resultBgType").value;
+    const bgColorGroup = document.getElementById("resultBgColorGroup");
+    const bgImageGroup = document.getElementById("resultBgImageGroup");
+
+    // Hide all groups first
+    if (bgColorGroup) bgColorGroup.style.display = "none";
+    if (bgImageGroup) bgImageGroup.style.display = "none";
+
+    // Show relevant group
+    if (bgType === "color" && bgColorGroup) {
+      bgColorGroup.style.display = "block";
+    } else if (bgType === "image" && bgImageGroup) {
+      bgImageGroup.style.display = "block";
+    }
   }
 
   loadResultBackgroundImage(event) {
-    this.uiManager.loadResultBackgroundImage(event);
+    const file = event.target.files[0];
+    if (!file) {
+      // If no file selected, set default to lucky.png
+      localStorage.setItem("resultPanelBackgroundImage", "static/lucky.png");
+      console.log(
+        "No file selected. Set result panel background to static/lucky.png",
+      );
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const imageData = e.target.result;
+      // Save to localStorage
+      localStorage.setItem("resultPanelBackgroundImage", imageData);
+      console.log("Result panel background image loaded");
+    };
+    reader.readAsDataURL(file);
   }
 
   applyResultPanelSettings() {
-    this.uiManager.applyResultPanelSettings();
-  }
+    // Save custom prize title and prize names
+    this.savePrizeTitle();
+    this.savePrizeNames();
 
-  applyResultPanelBackgroundToDisplay(data) {
-    this.uiManager.applyResultPanelBackgroundToDisplay(data);
+    const bgType = document.getElementById("resultBgType").value;
+    const bgColor = document.getElementById("resultBgColor").value;
+    const bgImage = localStorage.getItem("resultPanelBackgroundImage");
+    const prizeTitle =
+      localStorage.getItem("customPrizeTitle") || "Prize Results";
+    const prizeNames = JSON.parse(
+      localStorage.getItem("customPrizeNames") || "{}",
+    );
+
+    // Get layout settings
+    const winnersGridWidthEl = document.getElementById("winnersGridWidth");
+    const cardGapEl = document.getElementById("cardGap");
+    const raceTrackAspectRatioEl = document.getElementById(
+      "raceTrackAspectRatio",
+    );
+
+    const winnersGridWidth = winnersGridWidthEl
+      ? winnersGridWidthEl.value
+      : "95";
+    const cardGap = cardGapEl ? cardGapEl.value : "1.5";
+
+    // Parse aspect ratio from input (e.g., "16:9" or "30:9")
+    let raceTrackWidth = "20";
+    let raceTrackHeight = "5";
+
+    if (raceTrackAspectRatioEl && raceTrackAspectRatioEl.value) {
+      const aspectRatio = raceTrackAspectRatioEl.value.trim();
+      const match = aspectRatio.match(/^(\d+):(\d+)$/);
+
+      if (match) {
+        raceTrackWidth = match[1];
+        raceTrackHeight = match[2];
+      } else {
+        alert(
+          '❌ Invalid aspect ratio format! Please use format like "16:9" or "30:9"',
+        );
+        return;
+      }
+    }
+
+    // Save layout settings to localStorage
+    localStorage.setItem("winnersGridWidth", winnersGridWidth);
+    localStorage.setItem("cardGap", cardGap);
+    localStorage.setItem("raceTrackWidth", raceTrackWidth);
+    localStorage.setItem("raceTrackHeight", raceTrackHeight);
+
+    // Apply race track aspect ratio
+    this.applyRaceTrackAspectRatio(raceTrackWidth, raceTrackHeight);
+
+    const resultPanel = document.getElementById("resultPanel");
+    if (!resultPanel) {
+      alert("Result panel not found!");
+      return;
+    }
+    localStorage.setItem("resultPanelBackgroundType", bgType);
+    localStorage.setItem("resultPanelBackgroundColor", bgColor);
+
+    // Apply settings immediately with !important to override CSS
+    if (bgType === "default") {
+      resultPanel.style.removeProperty("background");
+      resultPanel.style.removeProperty("background-image");
+      resultPanel.style.removeProperty("background-size");
+      resultPanel.style.removeProperty("background-position");
+      resultPanel.style.removeProperty("background-repeat");
+      resultPanel.style.removeProperty("background-color");
+      resultPanel.classList.remove("custom-background");
+    } else {
+      // Add class to hide pseudo-elements
+      resultPanel.classList.add("custom-background");
+
+      if (bgType === "color") {
+        resultPanel.style.setProperty("background", bgColor, "important");
+        resultPanel.style.removeProperty("background-image");
+      } else if (bgType === "image" && bgImage) {
+        resultPanel.style.setProperty(
+          "background-image",
+          `url(${bgImage})`,
+          "important",
+        );
+        resultPanel.style.setProperty("background-size", "cover", "important");
+        resultPanel.style.setProperty(
+          "background-position",
+          "center",
+          "important",
+        );
+        resultPanel.style.setProperty(
+          "background-repeat",
+          "no-repeat",
+          "important",
+        );
+        resultPanel.style.setProperty(
+          "background-color",
+          "transparent",
+          "important",
+        );
+      }
+    }
+
+    // Apply prize title immediately to result panel
+    const resultTitle = document.getElementById("resultTitle");
+    if (resultTitle) {
+      resultTitle.innerHTML = `🏆 ${prizeTitle}`;
+    }
+
+    // Re-render winner cards if there are winners
+    if (this.winners && this.winners.length > 0) {
+      const resultMessage = document.getElementById("resultMessage");
+      if (resultMessage) {
+        let html = '<div class="winners-list">';
+        html += `<div class="winners-grid" style="width: ${winnersGridWidth}%; gap: ${cardGap}%;">`;
+        this.winners.forEach((winner, index) => {
+          const medal =
+            index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `🏅`;
+          // Always use prizeName from winner object (set by script)
+          const prizeName = winner.prizeName || "Prize";
+          html += `
+                        <div class="winner-card">
+                            <div class="winner-medal">${medal}</div>
+                            <div class="winner-position">${prizeName}</div>
+                            <div class="winner-duck-name">${winner.name}</div>
+                        </div>
+                    `;
+        });
+        html += "</div></div>";
+
+        // Keep existing buttons if they exist
+        const existingActions = document.getElementById("resultActions");
+        if (existingActions) {
+          html += existingActions.outerHTML;
+        }
+
+        resultMessage.innerHTML = html;
+      }
+    }
+
+    // Send settings to display via BroadcastChannel
+    if (this.displayChannel) {
+      const settings = {
+        type: bgType,
+        color: bgColor,
+        image: bgImage,
+        prizeTitle: prizeTitle,
+        prizeNames: prizeNames,
+        winnersGridWidth: winnersGridWidth,
+        cardGap: cardGap,
+        raceTrackWidth: raceTrackWidth,
+        raceTrackHeight: raceTrackHeight,
+      };
+
+      this.displayChannel.postMessage({
+        type: "UPDATE_RESULT_PANEL_SETTINGS",
+        data: settings,
+      });
+
+      console.log("Result panel settings sent to display:", settings);
+    }
+
+    console.log("Result panel settings applied:", {
+      bgType,
+      bgColor,
+      prizeTitle,
+      prizeNames,
+      winnersGridWidth,
+      cardGap,
+      raceTrackWidth,
+      raceTrackHeight,
+    });
+    alert("✓ Result panel settings updated!");
   }
 
   resetResultPanelSettings() {
-    this.uiManager.resetResultPanelSettings();
+    const resultPanel = document.getElementById("resultPanel");
+
+    // Reset to default
+    document.getElementById("resultBgType").value = "default";
+    document.getElementById("resultBgColor").value = "#1a1a2e";
+
+    // Reset layout settings
+    const winnersGridWidthEl = document.getElementById("winnersGridWidth");
+    const cardGapEl = document.getElementById("cardGap");
+    const raceTrackAspectRatioEl = document.getElementById(
+      "raceTrackAspectRatio",
+    );
+
+    if (winnersGridWidthEl) {
+      winnersGridWidthEl.value = "95";
+      document.getElementById("winnersGridWidthValue").textContent = "95%";
+    }
+    if (cardGapEl) {
+      cardGapEl.value = "1.5";
+      document.getElementById("cardGapValue").textContent = "1.5%";
+    }
+    if (raceTrackAspectRatioEl) {
+      raceTrackAspectRatioEl.value = "20:5";
+      raceTrackAspectRatioEl.style.borderColor = "#667eea";
+      raceTrackAspectRatioEl.style.background = "rgba(0,0,0,0.3)";
+    }
+
+    // Reset prize title input
+    const titleInput = document.getElementById("prizeTitleInput");
+    if (titleInput) titleInput.value = "Prize Results";
+
+    // Reset prize name inputs
+    for (let i = 1; i <= 10; i++) {
+      const input = document.getElementById(`prizeName${i}`);
+      if (input) input.value = "";
+    }
+
+    // Clear localStorage
+    localStorage.removeItem("resultPanelBackgroundType");
+    localStorage.removeItem("resultPanelBackgroundColor");
+    localStorage.removeItem("resultPanelBackgroundImage");
+    localStorage.removeItem("customPrizeTitle");
+    localStorage.removeItem("customPrizeNames");
+    localStorage.removeItem("winnersGridWidth");
+    localStorage.removeItem("cardGap");
+    localStorage.removeItem("raceTrackWidth");
+    localStorage.removeItem("raceTrackHeight");
+
+    // Reset race track aspect ratio
+    this.applyRaceTrackAspectRatio(20, 5);
+
+    // Reset panel style completely
+    if (resultPanel) {
+      resultPanel.style.removeProperty("background");
+      resultPanel.style.removeProperty("background-image");
+      resultPanel.style.removeProperty("background-size");
+      resultPanel.style.removeProperty("background-position");
+      resultPanel.style.removeProperty("background-repeat");
+      resultPanel.style.removeProperty("background-color");
+      resultPanel.classList.remove("custom-background");
+    }
+
+    // Hide all option groups
+    this.toggleResultBackground();
+
+    // Send reset to display
+    if (this.displayChannel) {
+      this.displayChannel.postMessage({
+        type: "UPDATE_RESULT_PANEL_SETTINGS",
+        data: { type: "default" },
+      });
+      console.log("Result panel reset sent to display");
+    }
+
+    console.log("Result panel settings reset to default");
+    alert("✓ Settings reset to default!");
   }
 
+  // Load saved result panel settings on page load
   loadResultPanelSettings() {
-    this.uiManager.loadResultPanelSettings();
-  }
+    // Load custom prize title
+    const savedTitle = localStorage.getItem("customPrizeTitle");
+    const titleInput = document.getElementById("prizeTitleInput");
+    if (titleInput && savedTitle) {
+      titleInput.value = savedTitle;
+    }
 
-  // ==================== History Manager Delegation ====================
+    // Load layout settings
+    const savedGridWidth = localStorage.getItem("winnersGridWidth") || "95";
+    const savedGap = localStorage.getItem("cardGap") || "1.5";
+    const savedTrackWidth = localStorage.getItem("raceTrackWidth") || "20";
+    const savedTrackHeight = localStorage.getItem("raceTrackHeight") || "5";
+
+    const winnersGridWidthEl = document.getElementById("winnersGridWidth");
+    const cardGapEl = document.getElementById("cardGap");
+    const raceTrackAspectRatioEl = document.getElementById(
+      "raceTrackAspectRatio",
+    );
+
+    if (winnersGridWidthEl) {
+      winnersGridWidthEl.value = savedGridWidth;
+      const widthValueEl = document.getElementById("winnersGridWidthValue");
+      if (widthValueEl) widthValueEl.textContent = savedGridWidth + "%";
+    }
+
+    if (cardGapEl) {
+      cardGapEl.value = savedGap;
+      const gapValueEl = document.getElementById("cardGapValue");
+      if (gapValueEl) gapValueEl.textContent = savedGap + "%";
+    }
+
+    if (raceTrackAspectRatioEl) {
+      raceTrackAspectRatioEl.value = `${savedTrackWidth}:${savedTrackHeight}`;
+    }
+
+    // Apply race track aspect ratio
+    this.applyRaceTrackAspectRatio(savedTrackWidth, savedTrackHeight);
+
+    if (cardGapEl) {
+      cardGapEl.value = savedGap;
+      const gapValueEl = document.getElementById("cardGapValue");
+      if (gapValueEl) gapValueEl.textContent = savedGap + "%";
+    }
+
+    // Load custom prize names
+    this.loadPrizeNames();
+
+    // Apply prize title to result panel (for display mode)
+    if (this.isDisplayMode) {
+      const resultTitle = document.querySelector(".result-title");
+      if (resultTitle && savedTitle) {
+        resultTitle.textContent = savedTitle;
+      }
+    }
+
+    const bgType = localStorage.getItem("resultPanelBackgroundType");
+    const bgColor = localStorage.getItem("resultPanelBackgroundColor");
+    const bgImage = localStorage.getItem("resultPanelBackgroundImage");
+
+    if (!bgType || bgType === "default") return;
+
+    const resultPanel = document.getElementById("resultPanel");
+    if (!resultPanel) return;
+
+    // Add class to hide pseudo-elements
+    resultPanel.classList.add("custom-background");
+
+    // Apply saved settings with !important
+    if (bgType === "color" && bgColor) {
+      resultPanel.style.setProperty("background", bgColor, "important");
+    } else if (bgType === "image" && bgImage) {
+      resultPanel.style.setProperty(
+        "background-image",
+        `url(${bgImage})`,
+        "important",
+      );
+      resultPanel.style.setProperty("background-size", "cover", "important");
+      resultPanel.style.setProperty(
+        "background-position",
+        "center",
+        "important",
+      );
+      resultPanel.style.setProperty(
+        "background-repeat",
+        "no-repeat",
+        "important",
+      );
+      resultPanel.style.setProperty(
+        "background-color",
+        "transparent",
+        "important",
+      );
+    }
+
+    // Load saved duck size ratio (control mode setting)
+    const savedDuckRatio = parseFloat(localStorage.getItem("duckSizeRatio"));
+    if (!isNaN(savedDuckRatio) && savedDuckRatio > 0) {
+      this.duckSizeRatio = savedDuckRatio;
+      const trackElement = document.getElementById("raceTrack");
+      if (trackElement) {
+        const sizePx = this.trackHeight * this.duckSizeRatio;
+        trackElement.style.setProperty("--duck-size", `${sizePx}px`);
+      }
+      const duckSizeEl = document.getElementById("duckSizeRatio");
+      if (duckSizeEl) {
+        // Slider expects 10-100 (percent). Convert internal 0.1-1.0 -> 10-100
+        duckSizeEl.value = Math.round(this.duckSizeRatio * 100);
+      }
+      const duckSizeValue = document.getElementById("duckSizeValue");
+      if (duckSizeValue)
+        duckSizeValue.textContent = Math.round(this.duckSizeRatio * 100) + "%";
+    }
+
+    // Load persisted force cluster camera preference
+    try {
+      const savedForce = localStorage.getItem("forceClusterCamera") === "true";
+      this.forceClusterCamera = !!savedForce;
+      const forceEl = document.getElementById("forceClusterToggle");
+      if (forceEl) forceEl.checked = this.forceClusterCamera;
+    } catch (e) {
+      console.warn("Failed to load forceClusterCamera setting:", e);
+    }
+
+    // Load persisted finish safe zone
+    try {
+      const savedSafeZone = parseInt(
+        localStorage.getItem("finishSafeZone"),
+        10,
+      );
+      if (!isNaN(savedSafeZone) && savedSafeZone >= 0) {
+        this.finishSafeZone = savedSafeZone;
+      }
+      const fsEl = document.getElementById("finishSafeZone");
+      if (fsEl) fsEl.value = this.finishSafeZone;
+      const fsVal = document.getElementById("finishSafeZoneValue");
+      if (fsVal) fsVal.textContent = `${this.finishSafeZone}px`;
+    } catch (e) {
+      console.warn("Failed to load finishSafeZone setting:", e);
+    }
+
+    // Finish stagger setting: when enabled, finished ducks are vertically staggered to prevent overlap
+    // Default: OFF (natural finish)
+    try {
+      this.finishStaggerEnabled = false; // default off
+      const savedStagger = localStorage.getItem("finishStaggerEnabled");
+      if (savedStagger === "true") this.finishStaggerEnabled = true;
+      const fsToggle = document.getElementById("finishStaggerToggle");
+      if (fsToggle) fsToggle.checked = this.finishStaggerEnabled;
+    } catch (e) {
+      console.warn("Failed to load finishStaggerEnabled setting:", e);
+    }
+
+    console.log("Result panel settings loaded:", {
+      bgType,
+      bgColor,
+      isDisplayMode: this.isDisplayMode,
+    });
+  }
 
   loadStats() {
-    return this.historyManager.loadStats();
+    const saved = localStorage.getItem("duckRaceStats");
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    return {
+      totalRaces: 0,
+      top3Finishes: 0,
+      wins: 0,
+    };
   }
 
   saveStats() {
-    this.historyManager.saveStats();
+    localStorage.setItem("duckRaceStats", JSON.stringify(this.stats));
   }
 
   loadWinners() {
-    return this.historyManager.loadWinners();
+    const saved = localStorage.getItem("duckRaceWinners");
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    return [];
   }
 
   saveWinners() {
-    this.historyManager.saveWinners();
-  }
-
-  showTopNVictoryPopup() {
-    this.historyManager.showTopNVictoryPopup();
-  }
-
-  closeTopNVictoryPopup() {
-    this.historyManager.closeTopNVictoryPopup();
-  }
-
-  continueRace() {
-    this.historyManager.continueRace();
-  }
-
-  showWinnersPanel() {
-    this.historyManager.showWinnersPanel();
-  }
-
-  sendResultsToDisplay() {
-    this.historyManager.sendResultsToDisplay();
-  }
-
-  resetHistory() {
-    this.historyManager.resetHistory();
-  }
-
-  // ==================== Race Controller Delegation ====================
-
-  startRace() {
-    this.raceController.startRace();
-  }
-
-  setupRaceOnly() {
-    this.raceController.setupRaceOnly();
-  }
-
-  pauseRace() {
-    this.raceController.pauseRace();
-  }
-
-  resumeRace() {
-    this.raceController.resumeRace();
-  }
-
-  endRace() {
-    this.raceController.endRace();
-  }
-
-  processRaceResults(winner, finishTime) {
-    this.raceController.processRaceResults(winner, finishTime);
-  }
-
-  // ==================== File Manager Delegation ====================
-
-  loadDuckNames(event) {
-    this.fileManager.loadDuckNames(event);
-  }
-
-  loadSavedData() {
-    this.fileManager.loadSavedData();
-  }
-
-  updateFileStatus(fileName) {
-    this.fileManager.updateFileStatus(fileName);
-  }
-
-  clearLoadedFile() {
-    this.fileManager.clearLoadedFile();
-  }
-
-  // ==================== ImageLoader Delegation ====================
-
-  preloadDuckImages() {
-    this.imageLoader.preloadDuckImages();
-  }
-
-  enableStartButton() {
-    this.imageLoader.enableStartButton();
-  }
-
-  showLoading(message, progress) {
-    this.imageLoader.showLoading(message, progress);
-  }
-
-  updateLoadingProgress(message, progress) {
-    this.imageLoader.updateLoadingProgress(message, progress);
-  }
-
-  hideLoading() {
-    this.imageLoader.hideLoading();
-  }
-
-  updateGameSpeed(speed) {
-    this.imageLoader.updateGameSpeed(speed);
+    localStorage.setItem("duckRaceWinners", JSON.stringify(this.winners));
   }
 
   updateStatsDisplay() {
@@ -1212,7 +2886,7 @@ class Game {
   }
 
   detectAvailableThemes() {
-    // Tá»± Ä‘á»™ng phÃ¡t hiá»‡n cÃ¡c thÆ° má»¥c output_X
+    // Tự động phát hiện các thư mục output_X
     const themeSelect = document.getElementById("iconTheme");
 
     // Skip if element doesn't exist (display mode)
@@ -1221,7 +2895,7 @@ class Game {
       return;
     }
 
-    themeSelect.innerHTML = ""; // XÃ³a cÃ¡c option cÅ©
+    themeSelect.innerHTML = ""; // Xóa các option cũ
 
     let themeIndex = 1;
     let consecutiveFails = 0;
@@ -1233,10 +2907,10 @@ class Game {
       testImg.src = `${themeName}/Input_Icon_01.webp`;
 
       testImg.onload = () => {
-        // ThÆ° má»¥c tá»“n táº¡i, thÃªm vÃ o dropdown
+        // Thư mục tồn tại, thêm vào dropdown
         const option = document.createElement("option");
         option.value = themeName;
-        option.textContent = `Chá»§ Ä‘á» ${index}`;
+        option.textContent = `Chủ đề ${index}`;
         themeSelect.appendChild(option);
 
         consecutiveFails = 0;
@@ -1265,9 +2939,39 @@ class Game {
     this.detectAndLoadDuckImages();
   }
 
-  // toggleRaceMode khÃ´ng cÃ²n cáº§n thiáº¿t, giá»¯ láº¡i cho tÆ°Æ¡ng thÃ­ch cÅ© náº¿u bá»‹ gá»i ngoÃ i, nhÆ°ng khÃ´ng lÃ m gÃ¬
+  // toggleRaceMode không còn cần thiết, giữ lại cho tương thích cũ nếu bị gọi ngoài, nhưng không làm gì
   toggleRaceMode() {}
 
+  updateGameSpeed(speed) {
+    this.gameSpeed = speed;
+    console.log(`🎮 Game speed updated to: ${speed}x`);
+  }
+
+  // Loading UI helper methods
+  showLoading(message, progress) {
+    const loadingContainer = document.getElementById("loadingContainer");
+    const loadingText = document.getElementById("loadingText");
+    const loadingProgress = document.getElementById("loadingProgress");
+
+    if (loadingContainer) loadingContainer.classList.remove("hidden");
+    if (loadingText) loadingText.textContent = message;
+    if (loadingProgress) loadingProgress.textContent = `${progress}%`;
+  }
+
+  updateLoadingProgress(message, progress) {
+    const loadingText = document.getElementById("loadingText");
+    const loadingProgress = document.getElementById("loadingProgress");
+
+    if (loadingText) loadingText.textContent = message;
+    if (loadingProgress) loadingProgress.textContent = `${progress}%`;
+  }
+
+  hideLoading() {
+    const loadingContainer = document.getElementById("loadingContainer");
+    if (loadingContainer) loadingContainer.classList.add("hidden");
+  }
+
+  // Toast Notification System
   showToastNotification(winner, position) {
     const container = document.getElementById("toastContainer");
     if (!container) return;
@@ -1297,7 +3001,7 @@ class Game {
             <div class="toast-content">
                 <p class="toast-position">🏆 ${getPositionSuffix(position)} Place!</p>
                 <p class="toast-name">${winner.name}</p>
-                <p class="toast-time"> ${finishTime}</p>
+                <p class="toast-time">⏱️ ${finishTime}</p>
             </div>
         `;
 
@@ -1315,8 +3019,51 @@ class Game {
     }, 3000);
 
     console.log(
-      `ðŸ“¢ Toast shown: ${getPositionSuffix(position)} - ${winner.name}`,
+      `📢 Toast shown: ${getPositionSuffix(position)} - ${winner.name}`,
     );
+  }
+
+  enableStartButton() {
+    // Only enable if display window is open and has loaded icons
+    if (
+      !this.isDisplayMode &&
+      this.displayWindow &&
+      !this.displayWindow.closed
+    ) {
+      if (!this.displayIconsLoaded) {
+        console.log("⏳ Display icons not loaded yet, waiting...");
+        return;
+      }
+    }
+
+    // Enable both Start Race buttons
+    const startBtn = document.getElementById("startRaceBtn");
+    const controlStartBtn = document.getElementById("controlStartBtn");
+
+    if (startBtn) {
+      startBtn.disabled = false;
+      startBtn.textContent = "🚀 Start Race";
+    }
+    if (controlStartBtn) {
+      controlStartBtn.disabled = false;
+      controlStartBtn.textContent = "🚀 Start";
+    }
+
+    // Enable Display link
+    const displayBtn = document.getElementById("openDisplayBtn");
+    if (displayBtn) {
+      displayBtn.style.pointerEvents = "auto";
+      displayBtn.style.opacity = "1";
+      displayBtn.textContent = "🖥️ Open Display";
+    }
+
+    // Show success notification only if loading container exists (not in display mode)
+    if (document.getElementById("loadingContainer")) {
+      this.updateLoadingProgress("✓ All icons loaded successfully!", 100);
+      setTimeout(() => {
+        this.hideLoading();
+      }, 1500);
+    }
   }
 
   disableStartButton() {
@@ -1335,7 +3082,7 @@ class Game {
   }
 
   detectAndLoadDuckImages() {
-    // Tá»± Ä‘á»™ng detect sá»‘ folder cÃ³ sáºµn trong theme
+    // Tự động detect số folder có sẵn trong theme
     console.log(`Starting icon detection for theme: ${this.currentTheme}`);
 
     const iconCountEl = document.getElementById("iconCount");
@@ -1348,7 +3095,7 @@ class Game {
       this.showLoading("Detecting icons...", 0);
     }
 
-    const maxFolders = 50; // Kiá»ƒm tra tá»‘i Ä‘a 50 folders
+    const maxFolders = 50; // Kiểm tra tối đa 50 folders
     let detectedCount = 0;
     let consecutiveFails = 0;
     const maxFails = 3;
@@ -1359,7 +3106,7 @@ class Game {
       testImg.src = testPath;
 
       testImg.onload = () => {
-        console.log(`âœ“ Found folder ${folderNum}`);
+        console.log(`✓ Found folder ${folderNum}`);
         detectedCount++;
         consecutiveFails = 0;
 
@@ -1381,12 +3128,12 @@ class Game {
       };
 
       testImg.onerror = () => {
-        console.log(`âœ— Folder ${folderNum} not found (path: ${testPath})`);
+        console.log(`✗ Folder ${folderNum} not found (path: ${testPath})`);
         consecutiveFails++;
         if (consecutiveFails < maxFails && folderNum < maxFolders) {
           checkFolder(folderNum + 1);
         } else {
-          // Káº¿t thÃºc detection
+          // Kết thúc detection
           this.iconCount = detectedCount;
           console.log(
             `Detection stopped at folder ${folderNum}. Total found: ${detectedCount}`,
@@ -1425,7 +3172,7 @@ class Game {
       return;
     }
 
-    // Load 3 frames tá»« má»—i folder
+    // Load 3 frames từ mỗi folder
     let loadedFolders = 0;
     const totalFolders = this.iconCount;
 
@@ -1435,7 +3182,7 @@ class Game {
       const frames = [];
       let loadedFrames = 0;
 
-      // Load 3 frames cho má»—i folder
+      // Load 3 frames cho mỗi folder
       for (let frameNum = 1; frameNum <= 3; frameNum++) {
         const img = new Image();
         img.src = `${this.currentTheme}/${folderNum}/compressed_final_${folderNum}_${frameNum}.webp`;
@@ -1496,14 +3243,417 @@ class Game {
       this.duckImages.push(frames);
     }
 
-    // Cáº­p nháº­t UI ngay láº­p tá»©c
+    // Cập nhật UI ngay lập tức
     const iconCountEl = document.getElementById("iconCount");
     if (iconCountEl) {
       iconCountEl.textContent = `Loading ${totalFolders} animated ducks...`;
     }
   }
 
+  preloadDuckImages() {
+    let loadedCount = 0;
+    const totalImages = this.iconCount;
+
+    for (let i = 1; i <= totalImages; i++) {
+      const img = new Image();
+      const paddedNum = String(i).padStart(2, "0");
+      img.src = `output/Input_Icon_${paddedNum}.webp`;
+
+      img.onload = () => {
+        loadedCount++;
+        if (loadedCount === totalImages) {
+          this.imagesLoaded = true;
+          console.log("All duck icons loaded!");
+        }
+      };
+
+      img.onerror = () => {
+        console.warn(`Failed to load: ${img.src}`);
+        loadedCount++;
+        if (loadedCount === totalImages) {
+          this.imagesLoaded = true;
+        }
+      };
+
+      this.duckImages.push(img);
+    }
+  }
+
   loadDuckNames(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const fileExt = file.name.split(".").pop().toLowerCase();
+
+    if (fileExt === "xlsx" || fileExt === "xls") {
+      // Đọc file Excel
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: "array" });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+          this.duckNames = [];
+          this.duckCodes = []; // Store employee codes separately
+
+          // Bỏ qua header (dòng 0), đọc từ dòng 1
+          // Cột 0: STT, Cột 1: Mã NV, Cột 2: Họ và tên
+          for (let i = 1; i < jsonData.length; i++) {
+            const row = jsonData[i];
+            if (row && row.length >= 3 && row[1] && row[2]) {
+              const code = String(row[1]).trim(); // Mã NV
+              const name = String(row[2]).trim(); // Họ và tên
+              if (code && name) {
+                // Internal name is just the full name
+                this.duckNames.push(name);
+                // Store code separately for display
+                this.duckCodes.push(code);
+                console.log(`Loaded row ${i}: Code=${code}, Name=${name}`);
+              }
+            }
+          }
+
+          if (this.duckNames.length > 0) {
+            this.activeDuckNames = [...this.duckNames];
+            this.activeDuckCodes = [...this.duckCodes];
+
+            if (this.winners.length > 0) {
+              const winnerNames = this.winners.map((w) => w.name);
+              // Filter both arrays together
+              const filteredData = this.duckNames
+                .map((name, index) => ({ name, code: this.duckCodes[index] }))
+                .filter((item) => !winnerNames.includes(item.name));
+              this.activeDuckNames = filteredData.map((item) => item.name);
+              this.activeDuckCodes = filteredData.map((item) => item.code);
+            }
+
+            // Save to localStorage for persistence
+            localStorage.setItem("duckNames", JSON.stringify(this.duckNames));
+            localStorage.setItem("duckCodes", JSON.stringify(this.duckCodes));
+            localStorage.setItem("excelFileName", file.name);
+
+            document.getElementById("duckCount").value = this.duckNames.length;
+            alert(`Đã tải ${this.duckNames.length} tên từ file Excel!`);
+
+            // Update file status UI
+            this.updateFileStatus(file.name);
+          } else {
+            alert("Không đọc được tên từ file Excel.");
+          }
+        } catch (error) {
+          console.error("Error reading Excel:", error);
+          alert("Lỗi khi đọc file Excel: " + error.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      // Đọc file CSV với encoding UTF-8
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target.result;
+        const lines = text.split("\n");
+
+        this.duckNames = [];
+        this.duckCodes = [];
+
+        // Cột 0: STT, Cột 1: Mã NV, Cột 2: Họ và tên
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+
+          const columns = line.split(",");
+          if (columns.length >= 3) {
+            const code = columns[1].trim(); // Mã NV
+            const name = columns[2].trim(); // Họ và tên
+            if (code && name) {
+              this.duckNames.push(name);
+              this.duckCodes.push(code);
+            }
+          }
+        }
+
+        if (this.duckNames.length > 0) {
+          this.activeDuckNames = [...this.duckNames];
+          this.activeDuckCodes = [...this.duckCodes];
+
+          if (this.winners.length > 0) {
+            const winnerNames = this.winners.map((w) => w.name);
+            const filteredData = this.duckNames
+              .map((name, index) => ({ name, code: this.duckCodes[index] }))
+              .filter((item) => !winnerNames.includes(item.name));
+            this.activeDuckNames = filteredData.map((item) => item.name);
+            this.activeDuckCodes = filteredData.map((item) => item.code);
+          }
+
+          // Save to localStorage for persistence
+          localStorage.setItem("duckNames", JSON.stringify(this.duckNames));
+          localStorage.setItem("duckCodes", JSON.stringify(this.duckCodes));
+          localStorage.setItem("excelFileName", file.name);
+
+          document.getElementById("duckCount").value = this.duckNames.length;
+          alert(`Đã tải ${this.duckNames.length} tên từ file CSV!`);
+
+          // Update file status UI
+          this.updateFileStatus(file.name);
+        } else {
+          alert("Không đọc được tên từ file CSV.");
+        }
+      };
+
+      // Chỉ định encoding UTF-8 để đọc tiếng Việt đúng
+      reader.readAsText(file, "UTF-8");
+    }
+  }
+
+  // Load saved Excel/CSV data from localStorage
+  loadSavedData() {
+    try {
+      const savedNames = localStorage.getItem("duckNames");
+      const savedCodes = localStorage.getItem("duckCodes");
+      const savedFileName = localStorage.getItem("excelFileName");
+
+      if (savedNames && savedCodes) {
+        this.duckNames = JSON.parse(savedNames);
+        this.duckCodes = JSON.parse(savedCodes);
+        this.activeDuckNames = [...this.duckNames];
+        this.activeDuckCodes = [...this.duckCodes];
+
+        // Filter out winners if any exist
+        if (this.winners.length > 0) {
+          const winnerNames = this.winners.map((w) => w.name);
+          const filteredData = this.duckNames
+            .map((name, index) => ({ name, code: this.duckCodes[index] }))
+            .filter((item) => !winnerNames.includes(item.name));
+          this.activeDuckNames = filteredData.map((item) => item.name);
+          this.activeDuckCodes = filteredData.map((item) => item.code);
+        }
+
+        document.getElementById("duckCount").value = this.duckNames.length;
+        console.log(
+          `✓ Restored ${this.duckNames.length} names from localStorage${savedFileName ? ` (${savedFileName})` : ""}`,
+        );
+
+        // Show notification and clear button
+        this.updateFileStatus(savedFileName);
+      }
+
+      // Load saved audio file status
+      const savedAudioFileName = localStorage.getItem("customAudioFileName");
+      if (savedAudioFileName) {
+        this.updateAudioFileStatus(savedAudioFileName);
+      }
+    } catch (e) {
+      console.error("Error loading saved data:", e);
+    }
+  }
+
+  updateFileStatus(fileName) {
+    const fileLabel = document.getElementById("fileLabel");
+    const clearBtn = document.getElementById("clearFileBtn");
+    const fileHelp = document.getElementById("fileHelp");
+
+    if (fileName && this.duckNames.length > 0) {
+      if (fileLabel)
+        fileLabel.innerHTML = `Racer List File <span style="color: #4CAF50;">(✓ Loaded: ${fileName})</span>:`;
+      if (clearBtn) clearBtn.style.display = "inline-block";
+      if (fileHelp)
+        fileHelp.innerHTML = `<span style="color: #4CAF50;">✓ Using ${this.duckNames.length} names from file. Click Clear to use random names instead.</span>`;
+    } else {
+      if (fileLabel) fileLabel.textContent = "Racer List File (CSV/Excel):";
+      if (clearBtn) clearBtn.style.display = "none";
+      if (fileHelp)
+        fileHelp.innerHTML =
+          "Upload CSV/Excel to use custom names, or leave empty for random names";
+    }
+  }
+
+  clearLoadedFile() {
+    if (
+      !confirm(
+        "Clear loaded file and use random names?\n\nThis will remove all custom names and codes.",
+      )
+    ) {
+      return;
+    }
+
+    // Clear data
+    this.duckNames = [];
+    this.duckCodes = [];
+    this.activeDuckNames = [];
+    this.activeDuckCodes = [];
+
+    // Clear localStorage
+    localStorage.removeItem("duckNames");
+    localStorage.removeItem("duckCodes");
+    localStorage.removeItem("excelFileName");
+    localStorage.removeItem("customPrizeNames");
+    localStorage.removeItem("prizeNamesSortOrder");
+
+    // Clear file input
+    const fileInput = document.getElementById("duckNamesFile");
+    if (fileInput) fileInput.value = "";
+
+    // Update UI
+    this.updateFileStatus(null);
+
+    console.log(
+      "✓ Cleared loaded file. You can now enter any number of racers.",
+    );
+    alert("File cleared! You can now enter any number of racers (up to 2000).");
+  }
+
+  updateAudioFileStatus(fileName) {
+    const audioLabel = document.getElementById("audioFileLabel");
+    const clearBtn = document.getElementById("clearAudioBtn");
+
+    if (fileName) {
+      if (audioLabel)
+        audioLabel.innerHTML = `Custom Race Sound <span style="color: #2ed573;">(✓ Loaded: ${fileName})</span>:`;
+      if (clearBtn) clearBtn.style.display = "inline-block";
+      // Save to localStorage
+      localStorage.setItem("customAudioFileName", fileName);
+    } else {
+      if (audioLabel) audioLabel.innerHTML = "Custom Race Sound (MP3):";
+      if (clearBtn) clearBtn.style.display = "none";
+      // Remove from localStorage
+      localStorage.removeItem("customAudioFileName");
+    }
+  }
+
+  clearAudioFile() {
+    if (
+      !confirm(
+        "Clear custom audio and use default race.mp3?\n\nThis will remove the custom sound.",
+      )
+    ) {
+      return;
+    }
+
+    // Clear audio from SoundManager
+    this.soundManager.clearCustomAudio();
+
+    // Clear file input
+    const fileInput = document.getElementById("customSoundFile");
+    if (fileInput) fileInput.value = "";
+
+    // Clear from localStorage
+    localStorage.removeItem("customAudioData");
+    localStorage.removeItem("customAudioFileName");
+    console.log("💾 Custom audio removed from localStorage");
+
+    // Update UI
+    this.updateAudioFileStatus(null);
+
+    // Send clear message to display
+    if (this.displayChannel) {
+      this.displayChannel.postMessage({
+        type: "CLEAR_CUSTOM_AUDIO",
+      });
+      console.log("📢 Sent CLEAR_CUSTOM_AUDIO to display");
+    }
+
+    console.log("✓ Custom audio cleared. Using default race.mp3.");
+    alert(
+      "✓ Custom audio cleared!\n\n📺 REFRESH (Ctrl+F5) the Display window to apply changes!",
+    );
+  }
+
+  startRace() {
+    // Check if a script is selected (running)
+    if (this.raceScripts && this.raceScripts.length > 0) {
+      const hasRunningScript = this.raceScripts.some(
+        (s) => s.status === "running",
+      );
+      if (!hasRunningScript) {
+        alert(
+          "⚠️ Vui lòng chọn script để chạy!\n\nNhấn nút START bên cạnh script bạn muốn chạy.",
+        );
+        return;
+      }
+    }
+
+    // Check if images are loaded
+    if (!this.imagesLoaded) {
+      console.warn("Cannot start race - images not loaded yet");
+      alert("Icons are still loading. Please wait a moment.");
+      return;
+    }
+
+    // Check if race is already running - prevent starting new race
+    if (this.raceStarted && !this.raceFinished) {
+      console.warn("Race is already running!");
+      alert(
+        "Cuộc đua đang chạy! Vui lòng đợi kết thúc hoặc nhấn Home để dừng.",
+      );
+      return;
+    }
+
+    // Always check and update mode from winner count
+    const winnerCountEl = document.getElementById("winnerCount");
+    if (winnerCountEl) {
+      const n = parseInt(winnerCountEl.value);
+      // Always use topN mode regardless of count
+      this.raceMode = "topN";
+      this.winnerCount = n;
+    }
+
+    console.log(
+      "startRace: Setting up race (not starting yet), mode:",
+      this.raceMode,
+    );
+
+    // Only setup race, don't start automatically
+    // User must press Start button on control panel to begin
+    this.setupRaceOnly();
+  }
+
+  setupRaceOnly() {
+    // Setup race without starting - just prepare everything
+    if (!this.isDisplayMode) {
+      // Lấy giá trị slider mới nhất trước khi setupRace
+      const duckSizeEl = document.getElementById("duckSizeRatio");
+      if (duckSizeEl) {
+        this.duckSizeRatio = parseFloat(duckSizeEl.value) / 100;
+        console.log(
+          "[DuckSize] Updated duckSizeRatio from slider:",
+          this.duckSizeRatio,
+        );
+      }
+      this.setupRace();
+
+      // Show control panel with enabled Start button
+      const raceInfo = document.getElementById("raceInfo");
+      const controlPanel = document.getElementById("controlPanel");
+      const controlStartBtn = document.getElementById("controlStartBtn");
+      const raceStatus = document.getElementById("raceStatus");
+
+      if (raceInfo) raceInfo.classList.remove("hidden");
+      if (controlPanel) controlPanel.classList.remove("hidden");
+      if (controlStartBtn) {
+        controlStartBtn.disabled = false;
+        controlStartBtn.textContent = "🚀 Start";
+      }
+      if (raceStatus)
+        raceStatus.textContent = "Ready to start - Press Start button!";
+
+      console.log("✅ Race setup complete. Press Start button to begin.");
+    }
+  }
+
+  controlStartRace() {
+    // This is called when user presses Start button on control panel
+    // Check if there's a running script
+    const hasRunningScript =
+      this.raceScripts && this.raceScripts.some((s) => s.status === "running");
+    if (!hasRunningScript) {
+      alert(
+        "⚠️ Vui lòng chọn script để chạy!\n\nNhấn nút START bên cạnh script bạn muốn chạy.",
+      );
+      return;
+    }
+
     // Now actually start the race
     console.log("controlStartRace: Beginning race from control panel");
     this.proceedWithRaceStart();
@@ -1556,6 +3706,7 @@ class Game {
         startTime: this.startTime, // Send synchronized start time
         usedPrizesCount: this.usedPrizesCount, // Send prize counter
         prizeRaceList: [...this.prizeRaceList], // Send prize list
+        currentScriptPrizeName: this.currentScriptPrizeName, // Send prize name from script
       };
 
       console.log("Race data to send:", raceData);
@@ -1566,7 +3717,7 @@ class Game {
       });
 
       console.log("START_RACE message posted to channel");
-      console.log("âœ… Message sent to display tab (if open)");
+      console.log("✅ Message sent to display tab (if open)");
     } else {
       console.warn("startRace: displayChannel not available");
     }
@@ -1586,7 +3737,7 @@ class Game {
         this.raceDuration = parseInt(raceDurationEl.value) || 10;
       if (gameSpeedEl) this.gameSpeed = parseFloat(gameSpeedEl.value) || 1.0;
 
-      // Láº¥y mode tá»« winnerCount
+      // Lấy mode từ winnerCount
       if (winnerCountEl) {
         const n = parseInt(winnerCountEl.value);
         // Always use topN mode
@@ -1595,7 +3746,7 @@ class Game {
       }
 
       console.log(
-        `ðŸ Race Setup - Mode: ${this.raceMode}, Winner Count: ${this.winnerCount}, Duration: ${this.raceDuration}s, Speed: ${this.gameSpeed}x`,
+        `🏁 Race Setup - Mode: ${this.raceMode}, Winner Count: ${this.winnerCount}, Duration: ${this.raceDuration}s, Speed: ${this.gameSpeed}x`,
       );
 
       // Pre-check available participants before setup
@@ -1638,11 +3789,7 @@ class Game {
             type: "SOUND_TOGGLE_CHANGED",
             data: { enabled },
           });
-          console.log(
-            "ðŸ“¢ Initial sound state:",
-            enabled,
-            "- sent to display",
-          );
+          console.log("📢 Initial sound state:", enabled, "- sent to display");
         }
       }
     }
@@ -1723,15 +3870,15 @@ class Game {
         `[Track Debug] bankBot clientHeight: ${bankBot.clientHeight}`,
       );
 
-    // TÃ­nh trackLength dá»±a trÃªn tá»‘c Ä‘á»™ thá»±c táº¿ vá»›i delta time normalization
-    // baseSpeed: 3.2-4.0 px/frame (avg 3.6) @ 60 FPS vá»›i deltaTime = 1.0
-    // Tá»‘c Ä‘á»™ thá»±c táº¿: 3.6 px/frame * 60 fps = 216 px/s
-    // Rubber-banding lÃ m giáº£m tá»‘c Ä‘á»™ trung bÃ¬nh ~30% (leaders bá»‹ slow down)
-    // Turbo boost tÄƒng tá»‘c Ä‘á»™ cho laggers ~20%
-    // => Tá»‘c Ä‘á»™ hiá»‡u quáº£: 216 * 0.85 = ~183 px/s (balanced)
-    // UPDATE: Quan sÃ¡t thá»±c táº¿ cho tháº¥y vá»‹t cháº¡y NHANH Gáº¤P 2 Láº¦N â†’ giáº£m xuá»‘ng 1/2
+    // Tính trackLength dựa trên tốc độ thực tế với delta time normalization
+    // baseSpeed: 3.2-4.0 px/frame (avg 3.6) @ 60 FPS với deltaTime = 1.0
+    // Tốc độ thực tế: 3.6 px/frame * 60 fps = 216 px/s
+    // Rubber-banding làm giảm tốc độ trung bình ~30% (leaders bị slow down)
+    // Turbo boost tăng tốc độ cho laggers ~20%
+    // => Tốc độ hiệu quả: 216 * 0.85 = ~183 px/s (balanced)
+    // UPDATE: Quan sát thực tế cho thấy vịt chạy NHANH GẤP 2 LẦN → giảm xuống 1/2
     const baseEffectiveSpeed = 366; // px/s - doubled from observation (183 * 2)
-    // Race dÃ i hÆ¡n cáº§n track dÃ i hÆ¡n má»™t chÃºt do dynamic khÃ´ng á»•n Ä‘á»‹nh
+    // Race dài hơn cần track dài hơn một chút do dynamic không ổn định
     const durationFactor = Math.min(1.15, 1.0 + this.raceDuration / 600);
     const pixelsPerSecond = baseEffectiveSpeed * durationFactor;
 
@@ -1793,7 +3940,7 @@ class Game {
 
     // this.highlights = [];
 
-    // áº¨n finish line tá»« race trÆ°á»›c
+    // Ẩn finish line từ race trước
     const finishLineEl = document.getElementById("finishLine");
     if (finishLineEl) {
       finishLineEl.classList.add("hidden");
@@ -1803,11 +3950,11 @@ class Game {
     // Rebuild activeDuckNames from duckNames, excluding winners
     // This ensures we always start with correct list after mode changes
     if (this.duckNames.length > 0) {
-      // CÃ³ file CSV Ä‘Ã£ upload - rebuild tá»« full list
+      // Có file CSV đã upload - rebuild từ full list
       this.activeDuckNames = [...this.duckNames];
       this.activeDuckCodes = [...this.duckCodes];
     } else {
-      // KhÃ´ng cÃ³ file - rebuild full list vá»›i sá»‘ lÆ°á»£ng duckCount má»›i
+      // Không có file - rebuild full list với số lượng duckCount mới
       this.activeDuckNames = [];
       this.activeDuckCodes = [];
       for (let i = 1; i <= this.duckCount; i++) {
@@ -1833,7 +3980,7 @@ class Game {
       );
     }
 
-    // Láº¥y danh sÃ¡ch vá»‹t hiá»‡n táº¡i (limited by duckCount setting)
+    // Lấy danh sách vịt hiện tại (limited by duckCount setting)
     let currentDucks = this.activeDuckNames.slice(0, this.duckCount);
     let currentCodes = this.activeDuckCodes.slice(0, this.duckCount);
 
@@ -1857,10 +4004,10 @@ class Game {
     // Enable canvas rendering for large races (>100 ducks)
     this.useCanvasRendering = actualDuckCount > 100;
     if (this.useCanvasRendering) {
-      console.log(`ðŸŽ¨ Canvas mode ENABLED for ${actualDuckCount} ducks`);
+      console.log(`🎨 Canvas mode ENABLED for ${actualDuckCount} ducks`);
       this.setupCanvasRendering();
     } else {
-      console.log(`ðŸ“¦ DOM mode for ${actualDuckCount} ducks`);
+      console.log(`📦 DOM mode for ${actualDuckCount} ducks`);
       this.cleanupCanvas();
     }
 
@@ -1868,7 +4015,7 @@ class Game {
     this.useWorkers = actualDuckCount > 1000;
     if (this.useWorkers) {
       console.log(
-        `âš¡ Multi-threaded mode ENABLED for ${actualDuckCount} ducks (${this.workerCount} workers)`,
+        `⚡ Multi-threaded mode ENABLED for ${actualDuckCount} ducks (${this.workerCount} workers)`,
       );
       this.setupWorkers();
     } else {
@@ -1956,11 +4103,11 @@ class Game {
     if (this.imagesLoaded) {
       if (startBtn) {
         startBtn.disabled = false;
-        startBtn.textContent = "ðŸš€ Start Race";
+        startBtn.textContent = "🚀 Start Race";
       }
       if (controlStartBtn) {
         controlStartBtn.disabled = false;
-        controlStartBtn.textContent = "ðŸš€ Start";
+        controlStartBtn.textContent = "🚀 Start";
       }
     }
 
@@ -1975,7 +4122,7 @@ class Game {
     if (raceNumber) raceNumber.textContent = `#${this.currentRaceNumber}`;
     if (raceStatus) raceStatus.textContent = "Waiting to start...";
     if (timeLeft) timeLeft.textContent = `${this.raceDuration}s`;
-    if (fullscreenBtn) fullscreenBtn.textContent = "ðŸš€ Start";
+    if (fullscreenBtn) fullscreenBtn.textContent = "🚀 Start";
 
     // Initialize sound manager
     this.soundManager.init();
@@ -2043,7 +4190,7 @@ class Game {
     if (raceStatus) raceStatus.textContent = "Racing!";
     if (pauseBtn) pauseBtn.disabled = false;
     if (resumeBtn) resumeBtn.disabled = true;
-    if (fullscreenBtn) fullscreenBtn.textContent = "ðŸ”² Fullscreen";
+    if (fullscreenBtn) fullscreenBtn.textContent = "🔲 Fullscreen";
 
     // Disable start buttons during race
     if (startBtn) startBtn.disabled = true;
@@ -2084,7 +4231,7 @@ class Game {
     this.ctx.imageSmoothingEnabled = true;
     this.ctx.imageSmoothingQuality = "high";
 
-    console.log(`âœ“ Canvas initialized: ${canvas.width}x${canvas.height}`);
+    console.log(`✓ Canvas initialized: ${canvas.width}x${canvas.height}`);
   }
 
   cleanupCanvas() {
@@ -2111,14 +4258,14 @@ class Game {
         return;
       }
     }
-    console.log(`âœ“ Created ${this.workers.length} worker threads`);
+    console.log(`✓ Created ${this.workers.length} worker threads`);
   }
 
   cleanupWorkers() {
     if (this.workers.length > 0) {
       this.workers.forEach((w) => w.terminate());
       this.workers = [];
-      console.log("âœ“ Workers terminated");
+      console.log("✓ Workers terminated");
     }
   }
 
@@ -2160,9 +4307,9 @@ class Game {
     const duckHeight = this.trackHeight * this.duckSizeRatio;
     const topPadding = this.trackHeight * 0.02; // 2% padding
     const bottomPadding = this.trackHeight * 0.02; // 2% padding
-    // Sá»­a: khÃ´ng trá»« duckHeight Ä‘á»ƒ lane Ä‘áº§u/cuá»‘i sÃ¡t mÃ©p trÃªn/dÆ°á»›i
+    // Sửa: không trừ duckHeight để lane đầu/cuối sát mép trên/dưới
     const availableHeight = this.trackHeight - topPadding - bottomPadding;
-    // Náº¿u chá»‰ cÃ³ 1 vá»‹t thÃ¬ Ä‘áº·t laneHeight = 0 Ä‘á»ƒ khÃ´ng chia
+    // Nếu chỉ có 1 vịt thì đặt laneHeight = 0 để không chia
     const laneHeight =
       this.duckCount > 1 ? availableHeight / (this.duckCount - 1) : 0;
 
@@ -2170,7 +4317,7 @@ class Game {
     duckEl.className = "duck-element";
     duckEl.style.width = `${duckHeight}px`;
     duckEl.style.height = `${duckHeight}px`;
-    // Lane 0 sÃ¡t Ä‘Ã¡y river-race, lane N-1 sÃ¡t Ä‘á»‰nh, chia Ä‘á»u tá»« dÆ°á»›i lÃªn
+    // Lane 0 sát đáy river-race, lane N-1 sát đỉnh, chia đều từ dưới lên
     const laneIdx = index - 1;
     const laneCount = this.duckCount;
     const y = (this.trackHeight - duckHeight) * (1 - laneIdx / (laneCount - 1));
@@ -2180,7 +4327,7 @@ class Game {
     if (this.imagesLoaded && this.duckImages.length > 0) {
       const iconIndex = (duck.id - 1) % this.duckImages.length;
       const img = document.createElement("img");
-      // Sá»­ dá»¥ng frame Ä‘áº§u tiÃªn (index 0)
+      // Sử dụng frame đầu tiên (index 0)
       img.src = this.duckImages[iconIndex][0].src;
       img.className = "duck-icon";
       img.alt = duck.name;
@@ -2198,16 +4345,16 @@ class Game {
     nameLabel.className = "duck-name";
     nameLabel.textContent =
       duck.name.length > 20 ? duck.name.substring(0, 18) + ".." : duck.name;
-    // Ban Ä‘áº§u duck-name á»Ÿ sau icon
+    // Ban đầu duck-name ở sau icon
     duckEl.appendChild(nameLabel);
-    // Náº¿u Ä‘Ã£ vá» Ä‘Ã­ch thÃ¬ chuyá»ƒn dáº§n duck-name ra trÆ°á»›c icon
+    // Nếu đã về đích thì chuyển dần duck-name ra trước icon
     if (duck.finished) {
-      // Náº¿u cÃ³ img (icon) thÃ¬ chuyá»ƒn nameLabel ra trÆ°á»›c icon
+      // Nếu có img (icon) thì chuyển nameLabel ra trước icon
       const img = duckEl.querySelector(".duck-icon");
       if (img) {
-        // ThÃªm class Ä‘á»ƒ animate dá»‹ch chuyá»ƒn
+        // Thêm class để animate dịch chuyển
         nameLabel.classList.add("duck-name-move-front");
-        // ÄÆ°a nameLabel ra trÆ°á»›c icon
+        // Đưa nameLabel ra trước icon
         duckEl.insertBefore(nameLabel, img);
       }
     }
@@ -2222,7 +4369,7 @@ class Game {
     const duckHeight = this.trackHeight * this.duckSizeRatio;
     const topPadding = this.trackHeight * 0.02;
     const bottomPadding = this.trackHeight * 0.02;
-    // Sá»­a: khÃ´ng trá»« duckHeight Ä‘á»ƒ lane Ä‘áº§u/cuá»‘i sÃ¡t mÃ©p trÃªn/dÆ°á»›i
+    // Sửa: không trừ duckHeight để lane đầu/cuối sát mép trên/dưới
     const availableHeight = this.trackHeight - topPadding - bottomPadding;
     const laneHeight =
       this.duckCount > 1 ? availableHeight / (this.duckCount - 1) : 0;
@@ -2230,12 +4377,12 @@ class Game {
     this.ducks.forEach((duck, index) => {
       const duckEl = this.duckElements.get(duck.id);
       if (duckEl) {
-        // Lane 0 sÃ¡t Ä‘Ã¡y river-race, lane N-1 sÃ¡t Ä‘á»‰nh, chia Ä‘á»u tá»« dÆ°á»›i lÃªn
+        // Lane 0 sát đáy river-race, lane N-1 sát đỉnh, chia đều từ dưới lên
         const laneCount = this.duckCount;
         const y =
           (this.trackHeight - duckHeight) * (1 - index / (laneCount - 1));
         duckEl.style.top = `${y}px`;
-        // Animate duck-name náº¿u Ä‘Ã£ vá» Ä‘Ã­ch
+        // Animate duck-name nếu đã về đích
         const nameLabel = duckEl.querySelector(".duck-name");
         const duckImg = duckEl.querySelector(".duck-icon");
         if (duck.finished && nameLabel && duckImg) {
@@ -2244,7 +4391,7 @@ class Game {
             duckEl.insertBefore(nameLabel, duckImg);
           }
         } else if (nameLabel && duckImg) {
-          // Náº¿u chÆ°a vá» Ä‘Ã­ch, Ä‘áº£m báº£o nameLabel á»Ÿ sau icon
+          // Nếu chưa về đích, đảm bảo nameLabel ở sau icon
           nameLabel.classList.remove("duck-name-move-front");
           if (duckImg.nextSibling !== nameLabel) {
             duckEl.appendChild(nameLabel);
@@ -2268,7 +4415,7 @@ class Game {
 
   // Update duck size ratio at runtime and apply to all elements
   setDuckSizeRatio(ratio) {
-    // Accept percent (10â€“100) or ratio (0.1â€“1.0)
+    // Accept percent (10–100) or ratio (0.1–1.0)
     let r = typeof ratio === "string" ? parseFloat(ratio) : ratio;
     if (isNaN(r) || r <= 0) return;
     if (r > 1) r = r / 100;
@@ -2332,7 +4479,7 @@ class Game {
         data: { enabled: this.forceClusterCamera },
       });
       console.log(
-        "ðŸ“¢ Sent FORCE_CLUSTER_CAMERA to channel:",
+        "📢 Sent FORCE_CLUSTER_CAMERA to channel:",
         this.forceClusterCamera,
       );
     }
@@ -2446,11 +4593,17 @@ class Game {
 
     // For Top N mode: Set currentRaceWinners from display data
     if (raceMode === "topN" && winners && winners.length > 0) {
-      // GÃ¡n prizePosition cho tá»«ng winner theo thá»© tá»± giáº£i
-      this.currentRaceWinners = winners.map((w, idx) => ({
-        ...w,
-        prizePosition: idx + 1,
-      }));
+      // Gán prizePosition và prizeName cho từng winner theo thứ tự giải
+      this.currentRaceWinners = winners.map((w, idx) => {
+        // Use prize name from script
+        const prizeName = this.currentScriptPrizeName || "";
+
+        return {
+          ...w,
+          prizePosition: idx + 1,
+          prizeName: prizeName, // Store prize name in winner object
+        };
+      });
       console.log(
         "Control: Set currentRaceWinners from display:",
         this.currentRaceWinners.length,
@@ -2468,22 +4621,36 @@ class Game {
         data: { winner },
       });
 
-      // Send different messages for normal vs Top N mode
-      // Both modes now use SHOW_TOPN_WINNER for consistency
-      setTimeout(() => {
-        this.displayChannel.postMessage({
-          type: "SHOW_TOPN_WINNER",
-          data: {
-            winners: this.currentRaceWinners, // Array of winners (1 or more)
-            finishTime: parseFloat(finishTime),
-          },
-        });
-        console.log(
-          "Control: Sent SHOW_TOPN_WINNER to display with",
-          this.currentRaceWinners.length,
-          "winner(s)",
-        );
-      }, 3000); // 3 second delay to see racers finish clearly
+      // Send popup message to display with winners and prize info
+      if (
+        raceMode === "topN" &&
+        this.currentRaceWinners &&
+        this.currentRaceWinners.length > 0
+      ) {
+        setTimeout(() => {
+          console.log(
+            "Sending SHOW_TOPN_WINNER to display with",
+            this.currentRaceWinners.length,
+            "winners",
+          );
+          console.log(
+            "Winners data being sent:",
+            JSON.stringify(
+              this.currentRaceWinners.map((w) => ({
+                name: w.name,
+                prizeName: w.prizeName,
+              })),
+            ),
+          );
+          this.displayChannel.postMessage({
+            type: "SHOW_TOPN_WINNER",
+            data: {
+              winners: this.currentRaceWinners,
+              finishTime: finishTime,
+            },
+          });
+        }, 5000);
+      }
     }
 
     // Show/hide continue buttons based on mode
@@ -2501,6 +4668,27 @@ class Game {
     }
     safeElementAction("pauseBtn", (el) => (el.disabled = true));
 
+    // Mark race script as completed when race finishes
+    if (!this.isDisplayMode && this.raceScripts) {
+      const runningScript = this.raceScripts.find(
+        (s) => s.status === "running",
+      );
+      if (runningScript) {
+        console.log(
+          `✓ Found running script to complete:`,
+          runningScript.id,
+          runningScript.prizeName,
+        );
+        this.markScriptCompleted(runningScript.id);
+        console.log(
+          `✓ Script "${runningScript.prizeName}" marked as completed`,
+        );
+      } else {
+        console.warn("⚠️ No running script found to mark as completed");
+        console.log("All scripts:", this.raceScripts);
+      }
+    }
+
     // Save winners to accumulated list and update UI
     if (raceMode === "topN") {
       // Top N mode: Merge current race winners into historical winners
@@ -2509,11 +4697,14 @@ class Game {
 
         this.currentRaceWinners.forEach((w, index) => {
           w._controlFinishTime = parseFloat(finishTime);
-          w.position = startPosition + index + 1; // Tá»•ng sá»‘ winner
+          w.position = startPosition + index + 1; // Tổng số winner
           w.raceNumber = this.currentRaceNumber;
-          w.prizePosition = w.prizePosition || index + 1; // Äáº£m báº£o cÃ³ prizePosition
+          w.prizePosition = w.prizePosition || index + 1; // Đảm bảo có prizePosition
           // Add to accumulated winners
           this.winners.push(w);
+          console.log(
+            `✓ Added winner ${w.name} with prizeName: "${w.prizeName}"`,
+          );
         });
 
         console.log(
@@ -2528,6 +4719,7 @@ class Game {
 
         // Save accumulated winners to localStorage
         this.saveWinners();
+        // Update victory history panel
         this.updateHistoryWin();
 
         // Update prize assignment UI with new winners
@@ -2535,11 +4727,12 @@ class Game {
           this.renderPrizeAssignmentUI();
         }
 
-        // Show Top N victory popup after delay (ONLY on control, not display)
+        // Don't show popup - only show result panel
+        // Show result panel immediately after race ends
         if (!this.isDisplayMode) {
           setTimeout(() => {
-            this.showTopNVictoryPopup();
-          }, 3000); // 3 second delay to see racers finish clearly
+            this.showWinnersPanel();
+          }, 1000);
         }
       }
     }
@@ -2569,6 +4762,12 @@ class Game {
     safeElementAction("raceStatus", (el) => (el.textContent = "Finished!"));
     safeElementAction("timeLeft", (el) => (el.textContent = "0s"));
     safeElementAction("pauseBtn", (el) => (el.disabled = true));
+
+    // Show Next Race button after race finishes
+    safeElementAction(
+      "nextRaceBtn",
+      (el) => (el.style.display = "inline-block"),
+    );
   }
 
   updateControlPanelTimer() {
@@ -2606,6 +4805,60 @@ class Game {
     // Continue updating every 100ms
     if (this.raceStarted && !this.raceFinished && !this.racePaused) {
       setTimeout(() => this.updateControlPanelTimer(), 100);
+    }
+  }
+
+  pauseRace() {
+    if (!this.racePaused && this.raceStarted && !this.raceFinished) {
+      this.racePaused = true;
+      this.pausedTime = Date.now();
+
+      // Stop animation interval
+      if (this.animationId) {
+        clearInterval(this.animationId);
+        this.animationId = null;
+      }
+
+      // Stop race sounds when paused
+      this.soundManager.stopRacingAmbiance();
+      safeElementAction("pauseBtn", (el) => (el.disabled = true));
+      safeElementAction("resumeBtn", (el) => (el.disabled = false));
+      safeElementAction("raceStatus", (el) => (el.textContent = "Paused"));
+
+      // Send pause command to display window
+      if (this.displayChannel && !this.isDisplayMode) {
+        this.displayChannel.postMessage({
+          type: "PAUSE_RACE",
+          data: {},
+        });
+        console.log("Sent PAUSE_RACE to display");
+      }
+    }
+  }
+
+  resumeRace() {
+    if (this.racePaused) {
+      this.racePaused = false;
+      const pauseDuration = Date.now() - this.pausedTime;
+      this.startTime += pauseDuration;
+      // Resume race sounds
+      this.soundManager.startRacingAmbiance(this.raceDuration);
+      safeElementAction("pauseBtn", (el) => (el.disabled = false));
+      safeElementAction("resumeBtn", (el) => (el.disabled = true));
+      safeElementAction("raceStatus", (el) => (el.textContent = "Racing!"));
+
+      // Reset frame time tracking
+      this.lastFrameTime = Date.now();
+      this.animationId = requestAnimationFrame((ts) => this.animate(ts));
+
+      // Send resume command to display window
+      if (this.displayChannel && !this.isDisplayMode) {
+        this.displayChannel.postMessage({
+          type: "RESUME_RACE",
+          data: { pauseDuration },
+        });
+        console.log("Sent RESUME_RACE to display");
+      }
     }
   }
 
@@ -2706,7 +4959,7 @@ class Game {
         if (this.isDisplayMode) {
           // Display mode: For Top N, just log; race end is detected by counting all finished ducks below
           if (this.raceMode === "topN") {
-            console.log(`ðŸ Display: Duck finished:`, duck.name);
+            console.log(`🏁 Display: Duck finished:`, duck.name);
           } else {
             hasFinisher = true;
           }
@@ -2755,7 +5008,7 @@ class Game {
             });
 
             console.log(
-              `ðŸ† Winner #${this.currentRaceWinners.length}:`,
+              `🏆 Winner #${this.currentRaceWinners.length}:`,
               duck.name,
               "Time:",
               duck.finishTime,
@@ -2779,7 +5032,7 @@ class Game {
             // Normal mode: just mark that someone finished (don't add to winners array)
             hasFinisher = true;
             console.log(
-              `ðŸ First finisher: ${duck.name}, Time: ${duck.finishTime}`,
+              `🏁 First finisher: ${duck.name}, Time: ${duck.finishTime}`,
             );
           }
         }
@@ -2877,7 +5130,7 @@ class Game {
 
       const distanceToFinish = this.trackLength - leaderPosition;
 
-      // Log thÃ´ng tin vá»‹t dáº«n Ä‘áº§u real-time vá»›i tá»‘c Ä‘á»™ vÃ  delta time
+      // Log thông tin vịt dẫn đầu real-time với tốc độ và delta time
       const leaderSpeed = leader.speed || 0;
       const effectiveSpeed = leaderSpeed * this.deltaTime;
       const estimatedTimeToFinish =
@@ -2917,7 +5170,7 @@ class Game {
       let leaderScreenPosition = 0.4;
 
       // When approaching finish line, shift camera RIGHT to show finish line + space for ducks to cross
-      const finishLineRevealDistance = this.viewportWidth * 2.0; // Hiá»ƒn sá»›m hÆ¡n (2.0 thay vÃ¬ 1.5)
+      const finishLineRevealDistance = this.viewportWidth * 2.0; // Hiển sớm hơn (2.0 thay vì 1.5)
 
       // Store whether we're in finish approach zone
       const inFinishApproach = distanceToFinish <= finishLineRevealDistance;
@@ -3117,7 +5370,7 @@ class Game {
         const velocityChange = Math.abs(this.cameraVelocity - oldVelocity);
         const offsetChange = Math.abs(this.cameraOffset - oldCameraOffset);
         console.log(
-          `ðŸ“¹ Camera | Vel: ${this.cameraVelocity.toFixed(2)} (Î”${velocityChange.toFixed(2)}) | Offset: ${this.cameraOffset.toFixed(0)} (Î”${offsetChange.toFixed(2)}) | Target: ${targetVelocity.toFixed(2)} | DeltaT: ${this.deltaTime.toFixed(3)}/${this.smoothedDeltaTime.toFixed(3)}`,
+          `📹 Camera | Vel: ${this.cameraVelocity.toFixed(2)} (Δ${velocityChange.toFixed(2)}) | Offset: ${this.cameraOffset.toFixed(0)} (Δ${offsetChange.toFixed(2)}) | Target: ${targetVelocity.toFixed(2)} | DeltaT: ${this.deltaTime.toFixed(3)}/${this.smoothedDeltaTime.toFixed(3)}`,
         );
       }
 
@@ -3133,7 +5386,7 @@ class Game {
         if (finishLine && finishLine.classList.contains("hidden")) {
           finishLine.classList.remove("hidden");
           console.log(
-            `%c[Finish Line] ðŸ REVEALED! Distance: ${distanceToFinish.toFixed(0)}px | Leader will shift from 40% to 20%`,
+            `%c[Finish Line] 🏁 REVEALED! Distance: ${distanceToFinish.toFixed(0)}px | Leader will shift from 40% to 20%`,
             "color: #FFD700; font-weight: bold; font-size: 16px;",
           );
         }
@@ -3152,7 +5405,7 @@ class Game {
         if (Math.random() < 0.01) {
           // 1% chance per frame
           console.log(
-            `ðŸ Finish Line | Screen X: ${finishScreenX.toFixed(0)}px | Viewport: ${this.viewportWidth}px | Visible: ${finishScreenX >= -100 && finishScreenX <= this.viewportWidth + 100}`,
+            `🏁 Finish Line | Screen X: ${finishScreenX.toFixed(0)}px | Viewport: ${this.viewportWidth}px | Visible: ${finishScreenX >= -100 && finishScreenX <= this.viewportWidth + 100}`,
           );
         }
       }
@@ -3374,7 +5627,7 @@ class Game {
             duck.lastLaneChangeTime = currentTime; // Record lane change time
             lanes[bestLane].push(duck);
             console.log(
-              `ðŸŽ¯ Lane switch: ${duck.name} | ${laneIndex} â†’ ${bestLane} | Cooldown: ${duck.laneChangeCooldown}ms`,
+              `🎯 Lane switch: ${duck.name} | ${laneIndex} → ${bestLane} | Cooldown: ${duck.laneChangeCooldown}ms`,
             );
 
             // Only move ONE duck per frame to avoid chaos
@@ -3434,7 +5687,7 @@ class Game {
 
           duckEl = document.createElement("div");
           duckEl.className = "duck-element";
-          // Äáº£o ngÆ°á»£c: lane 0 á»Ÿ dÆ°á»›i, lane N-1 á»Ÿ trÃªn
+          // Đảo ngược: lane 0 ở dưới, lane N-1 ở trên
           duckEl.style.top = `${topPadding + (NUM_DISPLAY_LANES - 1 - targetLane) * laneHeight}px`;
           duckEl.style.left = "0px";
           duckEl.style.transition = "top 0.5s ease-out"; // Smooth lane transitions
@@ -3494,7 +5747,7 @@ class Game {
           0,
           Math.min(NUM_DISPLAY_LANES - 1, duck.lane || 0),
         );
-        // Äáº£o ngÆ°á»£c: lane 0 á»Ÿ dÆ°á»›i, lane N-1 á»Ÿ trÃªn
+        // Đảo ngược: lane 0 ở dưới, lane N-1 ở trên
         const newTop =
           topPadding + (NUM_DISPLAY_LANES - 1 - targetLane) * laneHeight;
 
@@ -3507,9 +5760,9 @@ class Game {
           duck._lastTop = newTop;
         }
 
-        // Xá»­ lÃ½ hiá»‡u á»©ng chuyá»ƒn duck-name ra trÆ°á»›c icon khi vá»«a cÃ¡n Ä‘Ã­ch (cháº¯c cháº¯n)
+        // Xử lý hiệu ứng chuyển duck-name ra trước icon khi vừa cán đích (chắc chắn)
         const nameLabel = duckEl.querySelector(".duck-name");
-        // TÃ¬m icon: img (duck-icon) hoáº·c div (circle)
+        // Tìm icon: img (duck-icon) hoặc div (circle)
         let icon = duckEl.querySelector(".duck-icon");
         if (!icon) icon = duckEl.querySelector("div");
         if (nameLabel) {
@@ -3613,9 +5866,9 @@ class Game {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
     // Calculate duck metrics
-    // LuÃ´n láº¥y duckHeight tá»« this.duckSizeRatio hiá»‡n táº¡i
+    // Luôn lấy duckHeight từ this.duckSizeRatio hiện tại
     const duckHeight = this.trackHeight * this.duckSizeRatio;
-    // Log Ä‘á»ƒ debug live update
+    // Log để debug live update
     console.log(
       "[DuckSize][Canvas] duckHeight:",
       duckHeight,
@@ -3821,7 +6074,7 @@ class Game {
   // }
 
   updateHistoryWin() {
-    // Cáº­p nháº­t danh sÃ¡ch lá»‹ch sá»­ chiáº¿n tháº¯ng
+    // Cập nhật danh sách lịch sử chiến thắng
     const list = document.getElementById("historyWinList");
 
     console.log(
@@ -3853,17 +6106,13 @@ class Game {
 
     this.winners.forEach((winner, index) => {
       const medal =
-        index === 0 ? "ðŸ¥‡" : index === 1 ? "ðŸ¥ˆ" : index === 2 ? "ðŸ¥‰" : "";
+        index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "";
       const colorDot = winner.color
         ? `<span style="display:inline-block;width:12px;height:12px;background:${winner.color};border-radius:50%;margin-right:5px;"></span>`
         : "";
 
-      // Get prize name from prizeRaceList using index
-      let prizeName = this.prizeRaceList[index] || "";
-      // Fallback if prize name is empty or just a number
-      if (!prizeName || prizeName.trim() === "" || !isNaN(prizeName)) {
-        prizeName = `Giáº£i ${index + 1}`;
-      }
+      // Get prize name directly from winner object (set by script)
+      const prizeName = winner.prizeName || "Prize";
 
       // Create unique ID for winner (using name + index)
       const winnerId = `winner_${index}_${winner.name}`;
@@ -3879,7 +6128,7 @@ class Game {
             ${isChecked ? "checked" : ""}
             onchange="game.togglePrizeAssigned('${winnerId}')"
             style="cursor: pointer; width: 16px; height: 16px;"
-            title="ÄÃ£ gÃ¡n giáº£i thÆ°á»Ÿng"
+            title="Đã gán giải thưởng"
           />
           <span style="min-width: 150px; color: #67e8f9; font-size: 13px;">${prizeName}</span>
           <span style="flex: 1;">${medal}${colorDot}${winner.name}</span>
@@ -3908,13 +6157,207 @@ class Game {
         JSON.stringify(prizeAssignStates),
       );
       console.log(
-        `âœ“ Prize assignment state saved for ${winnerId}:`,
+        `✓ Prize assignment state saved for ${winnerId}:`,
         checkbox.checked,
       );
 
-      // Re-render prize assignment UI to update "(váº¯ng)" labels
+      // Re-render prize assignment UI to update "(vắng)" labels
       this.renderPrizeAssignmentUI();
     }
+  }
+
+  endRace() {
+    this.raceFinished = true;
+    this.raceStarted = false;
+
+    // Stop animation interval
+    if (this.animationId) {
+      clearInterval(this.animationId);
+      this.animationId = null;
+    }
+
+    // Stop racing sounds
+    this.soundManager.stopRacingAmbiance();
+
+    // Display mode: Send winner info back to control then stop
+    if (this.isDisplayMode) {
+      console.log("Display: Race ended, Mode:", this.raceMode);
+
+      // Calculate rankings
+      this.rankings = [...this.ducks].sort((a, b) => b.position - a.position);
+      const winner = this.rankings[0];
+
+      // Calculate finish time - use real time
+      const finishTime = ((Date.now() - this.startTime) / 1000).toFixed(2);
+
+      // For Top N mode: Get top N finishers from rankings
+      let topNWinners = null;
+      if (this.raceMode === "topN") {
+        // Get top N ducks that finished (crossed finish line)
+        const finishedDucks = this.rankings.filter(
+          (duck) => duck.position >= this.trackLength - FINISH_LINE_OFFSET,
+        );
+        topNWinners = finishedDucks.slice(0, this.winnerCount).map((duck) => ({
+          id: duck.id,
+          name: duck.name,
+          code: duck.code, // Include employee code
+          iconSrc: duck.iconSrc,
+          finishTime: duck.finishTime,
+          position: duck.position,
+        }));
+        console.log(
+          "Display: Calculated Top N winners:",
+          topNWinners.length,
+          "winners",
+        );
+      }
+
+      // Send race finished message to control panel
+      if (this.displayChannel) {
+        this.displayChannel.postMessage({
+          type: "DISPLAY_RACE_FINISHED",
+          data: {
+            winner,
+            finishTime: parseFloat(finishTime),
+            rankings: this.rankings,
+            raceMode: this.raceMode,
+            winnerCount: this.winnerCount,
+            winners: topNWinners, // Send top N winners for Top N mode
+          },
+        });
+        console.log(
+          "Display: Sent DISPLAY_RACE_FINISHED - Mode:",
+          this.raceMode,
+          "Winners:",
+          topNWinners?.length || 1,
+        );
+      }
+
+      return; // Display doesn't show victory popup locally
+    }
+
+    this.rankings = [...this.ducks].sort((a, b) => b.position - a.position);
+    const winner = this.rankings[0];
+
+    this.soundManager.playFinishSound();
+    setTimeout(() => this.soundManager.playCrowdCheer(), 300);
+
+    // Calculate finish time here to ensure consistency - use real time
+    const finishTime = ((Date.now() - this.startTime) / 1000).toFixed(2);
+
+    // Send finish message to display window (if display tab is open)
+    // Display will handle race finish and send DISPLAY_RACE_FINISHED back to control
+    // Control should wait for that message instead of processing winners here
+    if (this.displayChannel && !this.isDisplayMode) {
+      this.displayChannel.postMessage({
+        type: "RACE_FINISHED",
+        data: { winner },
+      });
+
+      // IMPORTANT: Return here! Let display handle race finish and send message back
+      // Winners will be processed in handleDisplayRaceFinished() to avoid duplicate
+      console.log(
+        "Control: Sent RACE_FINISHED to display, waiting for DISPLAY_RACE_FINISHED message",
+      );
+      return;
+    }
+
+    // Below code ONLY runs when control is standalone (no display tab)
+    console.log(
+      "Control: Running standalone mode (no display), processing winners locally",
+    );
+
+    // Show continue button in control panel (always hidden in topN mode)
+    safeElementAction("continueBtn", (el) => (el.style.display = "none"));
+    safeElementAction("continueBankBtn", (el) => el.classList.add("hidden"));
+    safeElementAction("pauseBtn", (el) => (el.disabled = true));
+
+    // Save winners to history and exclude them from next race (always topN mode)
+    // Merge current race winners into historical winners
+    if (this.currentRaceWinners && this.currentRaceWinners.length > 0) {
+      const startPosition = this.winners.length; // Continue numbering from last position
+
+      this.currentRaceWinners.forEach((w, index) => {
+        w._controlFinishTime = parseFloat(finishTime);
+        w.position = startPosition + index + 1; // Continue position numbering
+        w.raceNumber = this.currentRaceNumber;
+
+        // Add to accumulated winners
+        this.winners.push(w);
+      });
+
+      console.log(
+        `Top N mode: Added ${this.currentRaceWinners.length} new winners. Total winners: ${this.winners.length}`,
+      );
+
+      // Remove winners from activeDuckNames for next race
+      const winnerNames = this.currentRaceWinners.map((w) => w.name);
+      this.activeDuckNames = this.activeDuckNames.filter(
+        (name) => !winnerNames.includes(name),
+      );
+
+      // Save accumulated winners to localStorage
+      this.saveWinners();
+      // Don't update history win - removed
+
+      // Update prize assignment UI with new winners
+      if (this.renderPrizeAssignmentUI) {
+        this.renderPrizeAssignmentUI();
+      }
+
+      // Don't show popup - only show result panel
+      // Show result panel immediately
+      if (!this.isDisplayMode) {
+        setTimeout(() => {
+          this.showWinnersPanel();
+        }, 1000);
+      }
+    }
+
+    this.stats.totalRaces++;
+    if (this.rankings.indexOf(this.rankings[0]) < 3) {
+      this.stats.top3Finishes++;
+    }
+    this.saveStats();
+    // this.updateStatsDisplay(); // Stats panel removed
+
+    this.raceHistory.push({
+      raceNumber: this.currentRaceNumber,
+      mode: "topN",
+      winners: this.currentRaceWinners.map((w) => ({ id: w.id, name: w.name })),
+      winnerCount: this.winnerCount,
+      duckCount: this.duckCount,
+      duration: this.raceDuration,
+      timestamp: new Date().toLocaleString("vi-VN"),
+    });
+
+    safeElementAction("raceStatus", (el) => (el.textContent = "Finished!"));
+    safeElementAction("timeLeft", (el) => (el.textContent = "0s"));
+    safeElementAction("pauseBtn", (el) => (el.disabled = true));
+
+    const resultPanel = document.getElementById("resultPanel");
+    if (resultPanel) resultPanel.classList.remove("hidden");
+
+    safeElementAction(
+      "resultTitle",
+      (el) =>
+        (el.innerHTML = `🏆 Race Finished! <span style="font-size:0.6em;color:#888;">(Top ${this.winnerCount})</span>`),
+    );
+
+    let resultHTML = `
+            <div class="result-winner">
+                <h3>🏆 Winner: ${winner.name} 🏆</h3>
+                <div style="width:30px;height:30px;background:${winner.color};border-radius:50%;margin:10px auto;"></div>
+            </div>
+            <div class="result-stats">
+                <p><strong>Top 3:</strong></p>
+                <p>🥇 ${this.rankings[0].name} - ${((this.rankings[0].position / this.trackLength) * 100).toFixed(1)}%</p>
+                <p>🥈 ${this.rankings[1].name} - ${((this.rankings[1].position / this.trackLength) * 100).toFixed(1)}%</p>
+                <p>🥉 ${this.rankings[2].name} - ${((this.rankings[2].position / this.trackLength) * 100).toFixed(1)}%</p>
+            </div>
+        `;
+
+    document.getElementById("resultMessage").innerHTML = resultHTML;
   }
 
   // showVictoryPopup(winner) {
@@ -3938,10 +6381,10 @@ class Game {
   //     fullscreenElement.appendChild(popup);
   //   }
 
-  //   // Set winner icon vá»›i animation
+  //   // Set winner icon với animation
   //   if (this.imagesLoaded && this.duckImages.length > 0) {
   //     const iconIndex = (winner.id - 1) % this.duckImages.length;
-  //     // Táº¡o img element vá»›i frame Ä‘áº§u tiÃªn
+  //     // Tạo img element với frame đầu tiên
   //     const imgEl = document.createElement("img");
   //     imgEl.src = this.duckImages[iconIndex][0].src;
   //     imgEl.alt = winner.name;
@@ -3949,7 +6392,7 @@ class Game {
   //     winnerIconEl.innerHTML = "";
   //     winnerIconEl.appendChild(imgEl);
 
-  //     // Báº¯t Ä‘áº§u animation cho winner icon (nhanh hÆ¡n - má»—i 100ms)
+  //     // Bắt đầu animation cho winner icon (nhanh hơn - mỗi 100ms)
   //     this.winnerAnimationFrame = 0;
   //     if (this.winnerAnimationInterval) {
   //       clearInterval(this.winnerAnimationInterval);
@@ -4005,9 +6448,9 @@ class Game {
   //   // Use winner.position if available, else fallback to 1
   //   const winnerPos = winner.position || 1;
   //   winnerStatsEl.innerHTML = `
-  //       <p><strong>ðŸ† Prize:</strong> ${prizeName}</p>
-  //       <p><strong>ðŸ•’ Time:</strong> ${finishTime}s</p>
-  //       <p><strong>ðŸ“ Position:</strong> ${winnerPos}${this.getPositionSuffix(winnerPos)}</p>
+  //       <p><strong>🏆 Prize:</strong> ${prizeName}</p>
+  //       <p><strong>🕒 Time:</strong> ${finishTime}s</p>
+  //       <p><strong>📍 Position:</strong> ${winnerPos}${this.getPositionSuffix(winnerPos)}</p>
   //     `;
 
   //   // Show popup with animation
@@ -4024,7 +6467,7 @@ class Game {
     const popup = document.getElementById("victoryPopup");
     popup.classList.remove("show");
 
-    // Dá»«ng winner animation
+    // Dừng winner animation
     if (this.winnerAnimationInterval) {
       clearInterval(this.winnerAnimationInterval);
       this.winnerAnimationInterval = null;
@@ -4040,21 +6483,518 @@ class Game {
     }, 300);
   }
 
+  showTopNVictoryPopup() {
+    // Show only current race winners, not accumulated winners
+    const winnersToShow = this.currentRaceWinners || [];
+    console.log(
+      "Showing Top N victory popup with",
+      winnersToShow.length,
+      "winners from current race",
+    );
+
+    const popup = document.getElementById("topNVictoryPopup");
+    const topNCountEl = document.getElementById("topNCount");
+    const topNWinnersGridEl = document.getElementById("topNWinnersGrid");
+
+    // Collect assignments to sync Result panel with exactly what popup shows
+    const popupAssignments = [];
+
+    if (!popup || !topNWinnersGridEl) {
+      console.error("Top N victory popup elements not found!");
+      return;
+    }
+
+    // Update winner count
+    if (topNCountEl) {
+      topNCountEl.textContent = winnersToShow.length;
+    }
+
+    // Build winners grid - show only current race winners
+    let winnersHTML = "";
+    winnersToShow.forEach((winner, index) => {
+      const medal =
+        index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🏅";
+
+      // Always use prizeName from winner object (set by script)
+      const prizeName = winner.prizeName || "Prize";
+
+      console.log(
+        `Winner ${index}: prizeName="${prizeName}" (from winner.prizeName="${winner.prizeName}")`,
+      );
+      console.log(`Winner ${index} full object:`, JSON.stringify(winner));
+
+      // Create winner icon
+      let iconHTML = "";
+      if (this.imagesLoaded && this.duckImages.length > 0) {
+        const iconIndex = (winner.id - 1) % this.duckImages.length;
+        if (this.duckImages[iconIndex] && this.duckImages[iconIndex][0]) {
+          iconHTML = `<img src="${this.duckImages[iconIndex][0].src}" alt="${winner.name}">`;
+        }
+      }
+
+      winnersHTML += `
+            <div class="topn-winner-card">
+              <div class="topn-winner-medal">${medal}</div>
+              <div class="topn-winner-icon">${iconHTML}</div>
+              <div class="topn-winner-position">${prizeName}</div>
+              <div class="topn-winner-name">${this.getDisplayName(winner)}</div>
+            </div>
+          `;
+
+      // Store assignment exactly as shown in popup
+      popupAssignments.push({ prizeName, winnerId: winner.id });
+    });
+
+    topNWinnersGridEl.innerHTML = winnersHTML;
+
+    // Show popup with animation
+    popup.style.display = "flex";
+    popup.classList.remove("hidden");
+    setTimeout(() => {
+      popup.classList.add("show");
+    }, 10);
+
+    // ONLY control mode should update usedPrizesCount (display just shows popup)
+    if (!this.isDisplayMode) {
+      this.usedPrizesCount += winnersToShow.length;
+      localStorage.setItem("usedPrizesCount", this.usedPrizesCount.toString());
+      console.log(`✓ Updated usedPrizesCount: ${this.usedPrizesCount}`);
+
+      // Re-render prize UI to disable used prizes
+      if (this.renderPrizeRaceUI) {
+        this.renderPrizeRaceUI();
+      }
+
+      // Sync Result assignments with popup content to ensure names match
+      this.prizeResultAssignments = popupAssignments;
+      localStorage.setItem(
+        "prizeResultAssignments",
+        JSON.stringify(this.prizeResultAssignments),
+      );
+      if (this.renderPrizeAssignmentUI) {
+        this.renderPrizeAssignmentUI();
+      }
+
+      // Mark race script as completed after popup is shown and prizes updated
+      if (this.raceScripts) {
+        const runningScript = this.raceScripts.find(
+          (s) => s.status === "running",
+        );
+        if (runningScript) {
+          console.log(
+            `✓ Found running script to complete:`,
+            runningScript.id,
+            runningScript.prizeName,
+          );
+          this.markScriptCompleted(runningScript.id);
+          console.log(
+            `✓ Script "${runningScript.prizeName}" marked as completed`,
+          );
+        } else {
+          console.warn("⚠️ No running script found to mark as completed");
+          console.log("All scripts:", this.raceScripts);
+        }
+      }
+    } else {
+      console.log(
+        `📺 Display showing popup (usedPrizesCount NOT changed): ${this.usedPrizesCount}`,
+      );
+    }
+  }
+
+  closeTopNVictoryPopup() {
+    const popup = document.getElementById("topNVictoryPopup");
+    if (!popup) return;
+    popup.classList.remove("show");
+    setTimeout(() => {
+      popup.classList.add("hidden");
+      popup.style.display = "none";
+    }, 300);
+    // Gửi tín hiệu cho display để tắt popup Top N nếu đang ở chế độ điều khiển
+    if (this.displayChannel && !this.isDisplayMode) {
+      this.displayChannel.postMessage({
+        type: "CLOSE_TOPN_POPUP",
+        data: {},
+      });
+    }
+  }
+
+  continueRace() {
+    // Winner already saved in endRace() - just close popup and prepare for next race
+    console.log(
+      "Continue Race - Winner already saved. Total winners:",
+      this.winners.length,
+    );
+
+    // Đóng victory popup
+    this.closeVictoryPopup();
+
+    // Send message to display to close victory popup
+    if (this.displayChannel && !this.isDisplayMode) {
+      this.displayChannel.postMessage({
+        type: "CLOSE_VICTORY",
+        data: {},
+      });
+    }
+
+    // Ẩn result panel
+    safeElementAction("resultPanel", (el) => el.classList.add("hidden"));
+
+    // Check if enough racers remain
+    if (this.activeDuckNames.length < MINIMUM_PARTICIPANTS) {
+      alert(
+        `Only ${this.activeDuckNames.length} racers left! Not enough to continue (need at least ${MINIMUM_PARTICIPANTS} racers).`,
+      );
+      this.showWinnersPanel();
+      return;
+    }
+
+    // Reset và bắt đầu đua mới với số vịt còn lại
+    this.ducks = [];
+    this.duckElements.clear();
+    this.raceStarted = false;
+    this.raceFinished = false;
+    this.racePaused = false;
+    this.rankings = [];
+    // this.highlights = [];
+
+    // Send RESET_RACE message to display to clear old race
+    if (this.displayChannel && !this.isDisplayMode) {
+      this.displayChannel.postMessage({
+        type: "RESET_RACE",
+        data: {},
+      });
+      console.log("Sent RESET_RACE to display");
+    }
+
+    // Ẩn vạch đích
+    safeElementAction("finishLine", (el) => el.classList.add("hidden"));
+
+    if (this.trackContainer) {
+      // Clear only duck elements, preserve water-flow, water-ripples, fish-layer
+      const duckElements =
+        this.trackContainer.querySelectorAll(".duck-element");
+      duckElements.forEach((el) => el.remove());
+    }
+
+    // Display remaining racers count
+    alert(`Continue with ${this.activeDuckNames.length} remaining racers!`);
+
+    // Start new race setup
+    this.setupRace();
+  }
+
+  goHome() {
+    // If race is currently running, just show control panel (don't reset!)
+    if (this.raceStarted && !this.raceFinished) {
+      console.log("Race is running - showing control panel");
+
+      // Hide result and history panels
+      const resultPanel = document.getElementById("resultPanel");
+      const historyPanel = document.getElementById("historyPanel");
+      if (resultPanel) resultPanel.classList.add("hidden");
+      if (historyPanel) historyPanel.classList.add("hidden");
+
+      // Show control panel to monitor race
+      const raceInfo = document.getElementById("raceInfo");
+      const controlPanel = document.getElementById("controlPanel");
+      if (raceInfo) raceInfo.classList.remove("hidden");
+      if (controlPanel) controlPanel.classList.remove("hidden");
+
+      // Don't reset race state!
+      return;
+    }
+
+    // Race is not running - safe to go home and reset
+    // Stop the race if was paused
+    if (this.isRunning) {
+      this.stopRace();
+    }
+
+    // Hide all panels
+    const resultPanel = document.getElementById("resultPanel");
+    const historyPanel = document.getElementById("historyPanel");
+    const raceTrack = document.getElementById("raceTrack");
+    const controlPanel = document.getElementById("controlPanel");
+    const raceInfo = document.getElementById("raceInfo");
+
+    if (resultPanel) resultPanel.classList.add("hidden");
+    if (historyPanel) historyPanel.classList.add("hidden");
+    if (raceTrack) raceTrack.classList.add("hidden");
+    if (controlPanel) controlPanel.classList.add("hidden");
+    if (raceInfo) raceInfo.classList.add("hidden");
+
+    // Show settings panel
+    const settingsPanel = document.getElementById("settingsPanel");
+    if (settingsPanel) settingsPanel.classList.remove("hidden");
+
+    // Exit fullscreen if active
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    }
+
+    // Reset race state
+    this.reset();
+  }
+
+  // Next Race - Reset display to waiting screen
+  nextRace() {
+    console.log("Next Race - Resetting display to waiting screen");
+
+    // Hide popup on display if showing
+    if (this.displayChannel) {
+      this.displayChannel.postMessage({
+        type: "CLOSE_TOPN_POPUP",
+        data: {},
+      });
+    }
+
+    // Reset display to waiting screen
+    if (this.displayChannel) {
+      this.displayChannel.postMessage({
+        type: "RESET_RACE",
+        data: {},
+      });
+    }
+
+    // Hide Next Race button
+    safeElementAction("nextRaceBtn", (el) => (el.style.display = "none"));
+
+    // Hide result panel on control
+    const resultPanel = document.getElementById("resultPanel");
+    if (resultPanel) resultPanel.classList.add("hidden");
+
+    console.log("✓ Display reset to waiting screen, ready for next race");
+  }
+
+  showTopNResultPanel() {
+    console.log(
+      "Showing Top N Result Panel with",
+      this.winners.length,
+      "winners",
+    );
+
+    const resultPanel = document.getElementById("resultPanel");
+    resultPanel.classList.remove("hidden");
+
+    // Send results to display
+    if (this.displayChannel && !this.isDisplayMode) {
+      this.displayChannel.postMessage({
+        type: "SHOW_RESULTS",
+        data: {
+          winners: this.winners,
+          totalRaces: this.stats.totalRaces,
+          prizeTitle: this.getPrizeTitle(), // Add prize title
+        },
+      });
+    }
+
+    const prizeTitle = this.getPrizeTitle();
+    document.getElementById("resultTitle").innerHTML =
+      `🏆 ${prizeTitle} - Top ${this.winners.length}`;
+
+    // Get saved layout settings
+    const winnersGridWidth = localStorage.getItem("winnersGridWidth") || "95";
+    const cardGap = localStorage.getItem("cardGap") || "1.5";
+
+    let html = '<div class="winners-list">';
+
+    if (this.winners.length > 0) {
+      html += `<div class="winners-grid" style="width: ${winnersGridWidth}%; gap: ${cardGap}%;">`;
+      this.winners.forEach((winner, index) => {
+        const medal =
+          index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `🏅`;
+        // Always use prizeName from winner object (set by script)
+        const prizeName = winner.prizeName || "Prize";
+
+        // Create duck icon
+        let iconHTML = "";
+        if (this.imagesLoaded && this.duckImages.length > 0) {
+          const iconIndex = (winner.id - 1) % this.duckImages.length;
+          if (this.duckImages[iconIndex] && this.duckImages[iconIndex][0]) {
+            iconHTML = `<img src="${this.duckImages[iconIndex][0].src}" alt="${winner.name}" style="width: 60px; height: 60px; object-fit: contain;">`;
+          }
+        }
+
+        html += `
+                    <div class="winner-card">
+                        <div class="winner-medal">${medal}</div>
+                        <div class="winner-icon-display">${iconHTML}</div>
+                        <div class="winner-position">${prizeName}</div>
+                        <div class="winner-duck-name">${this.getDisplayName(winner)}</div>
+                    </div>
+                `;
+      });
+      html += "</div>";
+    } else {
+      html += "<p>No winners yet!</p>";
+    }
+
+    html += "</div>";
+    html += '<div class="result-actions" id="resultActions">';
+    html +=
+      '<button class="btn btn-secondary" onclick="game.sendResultsToDisplay()">📺 Send to Display</button>';
+    html += "</div>";
+
+    document.getElementById("resultMessage").innerHTML = html;
+
+    // Auto scroll to result panel
+    setTimeout(() => {
+      resultPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+
+    // Play celebration sound
+    this.soundManager.playCrowdCheer();
+  }
+
+  showWinnersPanel() {
+    const resultPanel = document.getElementById("resultPanel");
+    resultPanel.classList.remove("hidden");
+
+    const prizeTitle = this.getPrizeTitle();
+    document.getElementById("resultTitle").innerHTML = `🏆 ${prizeTitle}`;
+
+    // Get saved layout settings
+    const winnersGridWidth = localStorage.getItem("winnersGridWidth") || "95";
+    const cardGap = localStorage.getItem("cardGap") || "1.5";
+
+    let html = '<div class="winners-list">';
+
+    if (this.winners.length > 0) {
+      html += `<div class="winners-grid" style="width: ${winnersGridWidth}%; gap: ${cardGap}%;">`;
+      this.winners.forEach((winner, index) => {
+        const medal =
+          index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `🏅`;
+        // Always use prizeName from winner object (set by script)
+        const prizeName = winner.prizeName || "Prize";
+        html += `
+                    <div class="winner-card">
+                        <div class="winner-medal">${medal}</div>
+                        <div class="winner-position">${prizeName}</div>
+                        <div class="winner-duck-name">${this.getDisplayName(winner)}</div>
+                    </div>
+                `;
+      });
+      html += "</div>";
+    } else {
+      html += "<p>No winners yet!</p>";
+    }
+
+    html += "</div>";
+    html += '<div class="result-actions" id="resultActions">';
+    html +=
+      '<button class="btn btn-secondary" onclick="game.sendResultsToDisplay()">📺 Send to Display</button>';
+    html +=
+      '<button class="btn btn-secondary" onclick="game.resetHistory()">🗑️ Clear History</button>';
+    html += "</div>";
+
+    document.getElementById("resultMessage").innerHTML = html;
+
+    // Tự động cuộn đến panel kết quả
+    setTimeout(() => {
+      resultPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  }
+
+  sendResultsToDisplay() {
+    if (!this.displayChannel) {
+      alert("Display channel not available. Please open display tab first.");
+      return;
+    }
+
+    if (!this.winners || this.winners.length === 0) {
+      alert("No results to send!");
+      return;
+    }
+
+    console.log("📤 Sending results to display...");
+
+    // Send SHOW_RESULTS message with data
+    this.displayChannel.postMessage({
+      type: "SHOW_RESULTS",
+      data: {
+        winners: this.winners,
+        totalRaces: this.stats.totalRaces,
+        prizeTitle: this.getPrizeTitle(), // Add prize title from current script
+      },
+    });
+
+    console.log("✅ Results sent to display");
+    alert("Results sent to display! Check the display tab.");
+  }
+
+  resetHistory() {
+    if (
+      confirm(
+        "⚠️ RESTART: Xóa toàn bộ lịch sử, scripts và reset game về trạng thái ban đầu?\n\nKhông thể hoàn tác!",
+      )
+    ) {
+      this.winners = [];
+      this.activeDuckNames = [...this.duckNames];
+      this.usedPrizesCount = 0; // Reset prize counter
+
+      // Clear all scripts
+      this.raceScripts = [];
+      localStorage.removeItem("raceScripts");
+
+      // Reset prize list to default
+      this.prizeRaceList = ["Giải Nhất", "Giải Nhì", "Giải Ba"];
+      localStorage.setItem("prizeRaceList", JSON.stringify(this.prizeRaceList));
+
+      // Clear all prize-related localStorage
+      localStorage.setItem("usedPrizesCount", "0"); // Force set to 0
+      localStorage.removeItem("prizeResultAssignments");
+      localStorage.removeItem("duckRaceWinners");
+      localStorage.removeItem("prizeAssignStates"); // Clear checkbox states
+
+      this.saveWinners(); // Save empty winners array
+      this.prizeResultAssignments = []; // Reset result assignments
+
+      // Send reset message to display
+      if (this.displayChannel && !this.isDisplayMode) {
+        this.displayChannel.postMessage({
+          type: "RESET_HISTORY",
+          data: {},
+        });
+        console.log("📤 Sent RESET_HISTORY to display");
+      }
+
+      // Đóng popup victory nếu còn hiển thị
+      this.closeVictoryPopup && this.closeVictoryPopup();
+      this.closeTopNVictoryPopup && this.closeTopNVictoryPopup();
+
+      // Re-render prize UI immediately before reload
+      if (this.renderPrizeRaceUI) {
+        this.renderPrizeRaceUI();
+      }
+      if (this.renderPrizeAssignmentUI) {
+        this.renderPrizeAssignmentUI();
+      }
+
+      console.log(
+        "✓ Reset complete: usedPrizesCount set to 0, reloading page...",
+      );
+
+      // Reload page to refresh interface
+      setTimeout(() => location.reload(), 100);
+    }
+  }
+
   fullReset() {
-    // Reset hoÃ n toÃ n bao gá»“m cáº£ winners
-    localStorage.clear(); // XÃ³a toÃ n bá»™ localStorage khi restart
+    // Reset hoàn toàn bao gồm cả winners
+    localStorage.clear(); // Xóa toàn bộ localStorage khi restart
 
     // Reset all variables
     this.winners = [];
     this.excludedDucks = [];
-    this.activeDuckNames = [...this.duckNames]; // Reset vá» danh sÃ¡ch ban Ä‘áº§u
+    this.activeDuckNames = [...this.duckNames]; // Reset về danh sách ban đầu
     this.activeDuckCodes = [...this.duckCodes]; // Reset codes as well
     this.usedPrizesCount = 0; // Reset prize counter
     this.prizeResultAssignments = []; // Reset result assignments
-    this.prizeRaceList = ["Giáº£i Nháº¥t", "Giáº£i NhÃ¬", "Giáº£i Ba"]; // Reset to default
+    this.prizeRaceList = ["Giải Nhất", "Giải Nhì", "Giải Ba"]; // Reset to default
     this.raceScripts = []; // Clear all scripts
 
-    // ÄÃ³ng popup victory náº¿u cÃ²n hiá»ƒn thá»‹
+    // Đóng popup victory nếu còn hiển thị
     this.closeVictoryPopup && this.closeVictoryPopup();
     this.closeTopNVictoryPopup && this.closeTopNVictoryPopup();
     // Reload page to refresh interface
@@ -4130,7 +7070,7 @@ class Game {
   }
 
   reset() {
-    // Reset nhÆ°ng giá»¯ láº¡i winners vÃ  excludedDucks náº¿u cÃ³
+    // Reset nhưng giữ lại winners và excludedDucks nếu có
     this.ducks = [];
     this.duckElements.clear();
     this.raceStarted = false;
@@ -4167,11 +7107,6 @@ class Game {
 }
 
 console.log("Game class defined");
-
-// Export for ES modules
-export { Game };
-
-// Create global instance for backward compatibility
 const game = new Game();
-window.game = game; // Make it globally accessible
-console.log("Game instance created and exposed globally");
+window.game = game; // Make game accessible globally for onclick handlers
+console.log("Game instance created");

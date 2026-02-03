@@ -154,6 +154,24 @@ export class SoundManager {
     }
   }
 
+  // Clear custom audio and return to default
+  clearCustomAudio() {
+    console.log("🗑️ Clearing custom audio buffer");
+
+    // Stop custom audio if playing
+    if (this.customAudioSource) {
+      try {
+        this.customAudioSource.stop();
+      } catch (e) {}
+      this.customAudioSource = null;
+    }
+
+    // Clear buffer
+    this.customAudioBuffer = null;
+
+    console.log("✓ Custom audio cleared, will use default race.mp3");
+  }
+
   playStartSound() {
     if (!this.enabled || !this.initialized) return;
 
@@ -238,7 +256,14 @@ export class SoundManager {
   startRacingAmbiance(raceDuration = 30) {
     if (!this.enabled || !this.initialized) return;
 
-    // Play race.mp3 if loaded
+    // Priority 1: Use custom audio if loaded
+    if (this.customAudioBuffer) {
+      console.log("🎵 Using custom audio instead of default race audio");
+      this.playCustomAudio();
+      return;
+    }
+
+    // Priority 2: Play race.mp3 if loaded
     if (this.raceAudioBuffer && this.context) {
       // Stop previous race sound if playing
       if (this.raceAudioSource) {
@@ -252,28 +277,21 @@ export class SoundManager {
       this.raceAudioSource.connect(this.context.destination);
 
       // Loop if race duration > 30s
-      const raceMp3Duration = this.raceAudioBuffer.duration; // ~30s
-      if (raceDuration > raceMp3Duration) {
+      const raceAudioDuration = this.raceAudioBuffer.duration;
+      const audioName = "default race audio";
+      if (raceDuration > raceAudioDuration) {
         this.raceAudioSource.loop = true;
         console.log(
-          "🔊 Playing race.mp3 in LOOP (race duration:",
-          raceDuration + "s)",
+          `🔊 Playing ${audioName} in LOOP (race duration: ${raceDuration}s)`,
         );
       } else {
         this.raceAudioSource.loop = false;
         console.log(
-          "🔊 Playing race.mp3 once (race duration:",
-          raceDuration + "s)",
+          `🔊 Playing ${audioName} once (race duration: ${raceDuration}s)`,
         );
       }
 
       this.raceAudioSource.start(0);
-      return;
-    }
-
-    // Fallback: If custom audio is loaded, play it instead of procedural sounds
-    if (this.customAudioBuffer) {
-      this.playCustomAudio();
       return;
     }
 
@@ -317,11 +335,11 @@ export class SoundManager {
 
   // Stop racing ambiance
   stopRacingAmbiance() {
-    // Stop race.mp3 if playing
+    // Stop race audio if playing
     if (this.raceAudioSource) {
       try {
         this.raceAudioSource.stop();
-        console.log("🔇 Stopped race.mp3");
+        console.log("🔇 Stopped race audio");
       } catch (e) {}
       this.raceAudioSource = null;
     }

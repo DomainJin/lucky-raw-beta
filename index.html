@@ -208,7 +208,7 @@
             />
             <button
               class="btn"
-              onclick="game.addRaceScript()"
+              onclick="if (window.game) game.addRaceScript();"
               style="
                 background: #27ae60;
                 padding: 12px 20px;
@@ -241,320 +241,286 @@
           </small>
         </div>
 
-        <div class="input-group">
-          <label for="duckCount">Number of Racers:</label>
-          <input
-            type="number"
-            id="duckCount"
-            min="10"
-            max="10000"
-            value="300"
-          />
-        </div>
-        <div class="input-group">
-          <label for="raceDuration">Race Duration (seconds):</label>
-          <input type="number" id="raceDuration" min="5" max="300" value="30" />
-        </div>
-
-        <!-- <div class="input-group">
-          <label for="gameSpeed"
-            >Game Speed: <span id="gameSpeedValue">1.0x</span></label
-          >
-          <input
-            type="range"
-            id="gameSpeed"
-            min="0.25"
-            max="3"
-            step="0.25"
-            value="1"
-            oninput="
-              document.getElementById('gameSpeedValue').textContent =
-                this.value + 'x';
-              if (window.game) game.updateGameSpeed(parseFloat(this.value));
-            "
-          />
-          <small style="color: #888"
-            >Adjust race speed: 0.25x (slow motion) to 3x (fast forward)</small
-          >
-        </div>
-
-        <!-- <div class="input-group">
-          <label for="duckSizeRatio"
-            >Duck Size: <span id="duckSizeValue">50%</span></label
-          >
-          <input
-            type="range"
-            id="duckSizeRatio"
-            min="10"
-            max="100"
-            value="50"
-            step="1"
-            oninput="
-              document.getElementById('duckSizeValue').textContent =
-                this.value + '%'
-            "
-          />
-          <button
-            id="applyDuckSizeBtn"
-            type="button"
-            style="margin-left: 12px; vertical-align: middle"
-            onclick="
-              if (window.game) {
-                var val = document.getElementById('duckSizeRatio').value;
-                game.setDuckSizeRatio(parseFloat(val));
-                game.forceUpdateDuckSize && game.forceUpdateDuckSize();
-                // Gửi sang display luôn, không cần kiểm tra displayReady
-                var ratio = parseFloat(val) / 100;
-                if (game.displayChannel) {
-                  game.displayChannel.postMessage({
-                    type: 'UPDATE_DUCK_SIZE',
-                    duckSizeRatio: ratio,
-                  });
-                  console.log(
-                    '[DuckSize][control] Sent UPDATE_DUCK_SIZE to display:',
-                    ratio,
-                  );
-                }
-              }
-            "
-          >
-            Apply
-          </button>
-          <small style="color: #888"
-            >Adjust duck icon size relative to track height (10%–100%).</small
-          >
-        </div> -->
-
-        <div class="input-group">
-          <!-- Race Mode selection removed: now auto by number of winners -->
-        </div>
-
-        <!-- <div class="input-group">
-          <label for="finishSafeZone"
-            >Finish Safe Zone (px):
-            <span id="finishSafeZoneValue">0px</span></label
-          >
-          <input
-            type="range"
-            id="finishSafeZone"
-            min="0"
-            max="300"
-            step="5"
-            value="0"
-            oninput="
-              document.getElementById('finishSafeZoneValue').textContent =
-                this.value + 'px';
-              if (window.game) game.setFinishSafeZone(parseInt(this.value, 10));
-            "
-          />
-          <small style="color: #888"
-            >Pixels near finish where lane switching is disabled (reduces jumpy
-            lane changes).</small
-          >
-        </div>
-
-        <div class="input-group">
-          <label for="finishStaggerToggle">Enable Finish Stagger:</label>
-          <input
-            type="checkbox"
-            id="finishStaggerToggle"
-            onchange="
-              if (window.game) game.setFinishStaggerEnabled(this.checked);
-            "
-          />
-          <small style="color: #888"
-            >Toggle vertical staggering of finishers to reduce overlap. Leave
-            unchecked to allow natural finishing (default).</small
-          >
-        </div>
-        <div class="input-group">
-          <button
-            class="btn"
-            onclick="game.showCurrentSettings()"
-            style="background: #27ae60; width: 100%; margin-top: 10px"
-          >
-            📋 Show Current Settings
-          </button>
-        </div> -->
-
-        <!-- Number of Winners: Hidden, auto-calculated from prizes -->
-        <!-- <div class="input-group" style="display: none">
-          <label for="winnerCount">Number of Winners:</label>
-          <input
-            type="number"
-            id="winnerCount"
-            min="1"
-            max="50"
-            value="3"
-            onchange="
-              if (window.game) {
-                game.handleWinnerCountChange &&
-                  game.handleWinnerCountChange(this.value);
-              } else {
-                if (game) game.toggleRaceMode();
-              }
-            "
-          />
-          <small style="color: #888"
-            >Set 1 for Normal mode, >1 for Top N mode</small
-          >
-        </div> -->
-
-        <div class="input-group">
-          <label for="duckNamesFile" id="fileLabel"
-            >Racer List File (CSV/Excel):</label
-          >
-          <div style="display: flex; gap: 10px; align-items: center">
-            <input
-              type="file"
-              id="duckNamesFile"
-              accept=".csv,.xlsx,.xls"
-              onchange="game.loadDuckNames(event)"
-              style="flex: 1"
-            />
-            <button
-              onclick="game.clearLoadedFile()"
-              id="clearFileBtn"
-              class="btn btn-warning"
-              style="display: none; padding: 8px 16px"
-            >
-              🗑️ Clear
-            </button>
-          </div>
-          <small style="color: #888" id="fileHelp"
-            >Upload CSV/Excel to use custom names, or leave empty for random
-            names</small
-          >
-        </div>
-        <div class="input-group">
-          <label for="iconTheme">Icon Theme:</label>
-          <select id="iconTheme" onchange="game.changeIconTheme()">
-            <option value="output_1">Theme 1</option>
-            <option value="output_2">Theme 2</option>
-          </select>
-          <small style="color: #888" id="iconCount">0 icon</small>
-        </div>
-        <div class="input-group">
-          <label for="soundToggle">
-            <input type="checkbox" id="soundToggle" checked /> Enable Sound
-          </label>
-        </div>
-
-        <!-- <div class="input-group">
-          <label for="forceClusterToggle">
-            <input
-              type="checkbox"
-              id="forceClusterToggle"
-              onchange="
-                if (window.game) game.setForceClusterCamera(this.checked);
-              "
-            />
-            <strong>Force Cluster Camera</strong>
-          </label>
-          <small style="color: #888"
-            >When enabled, camera will focus on densest pack (useful for
-            testing)</small
-          >
-        </div> -->
-        <div class="input-group">
-          <label for="customSoundFile">Custom Race Sound (MP3):</label>
-          <input
-            type="file"
-            id="customSoundFile"
-            accept=".mp3,.wav,.ogg"
-            style="width: 100%; padding: 5px"
-          />
-          <small style="color: #888"
-            >Optional: Upload custom racing ambiance sound</small
-          >
-        </div>
+        <!-- File Upload Section - Enlarged and Highlighted -->
         <div
-          class="main-panel-background-settings"
-          style="font-size: 14px; color: #fff; margin: 20px 0 10px 0"
+          style="
+            margin: 25px 0;
+            padding: 20px;
+            background: linear-gradient(
+              135deg,
+              rgba(102, 126, 234, 0.15),
+              rgba(118, 75, 162, 0.15)
+            );
+            border: 2px solid #667eea;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+          "
         >
-          Background Settings
+          <h3
+            style="
+              color: #667eea;
+              margin: 0 0 15px 0;
+              font-size: 18px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            "
+          >
+            📊 Danh sách người chơi
+          </h3>
 
+          <!-- Two column layout for Number of Racers and File Upload -->
           <div
             style="
-              margin-top: 15px;
-              padding: 10px;
-              background: rgba(102, 126, 234, 0.1);
-              border-radius: 5px;
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 20px;
+              align-items: start;
             "
           >
-            <h4 style="color: #667eea; font-size: 16px; margin: 0 0 10px 0">
-              📐 Layout Settings
-            </h4>
-            <div
-              style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px"
-            >
-              <div style="display: flex; flex-direction: column; gap: 5px">
-                <label style="font-size: 14px; color: #fff"
-                  >Race Track Aspect Ratio:</label
-                >
-                <input
-                  type="text"
-                  id="raceTrackAspectRatio"
-                  value="20:5"
-                  placeholder="e.g., 16:9, 30:9, 21:9"
-                  style="
-                    padding: 8px;
-                    background: rgba(0, 0, 0, 0.3);
-                    border: 1px solid #667eea;
-                    border-radius: 5px;
-                    color: #fff;
-                    font-size: 14px;
-                  "
-                  oninput="validateAspectRatioInput(this)"
-                />
-                <small style="color: #888; font-size: 12px"
-                  >Format: width:height (e.g., 16:9, 30:9)</small
-                >
-              </div>
-              <!-- <div style="display: flex; flex-direction: column; gap: 5px">
-                    <label style="font-size: 14px; color: #fff"
-                      >Winners Grid Width:</label
-                    >
-                    <div style="display: flex; align-items: center; gap: 8px">
-                      <input
-                        type="range"
-                        id="winnersGridWidth"
-                        min="70"
-                        max="100"
-                        value="95"
-                        style="flex: 1"
-                      />
-                      <span
-                        id="winnersGridWidthValue"
-                        style="min-width: 40px; font-size: 14px; color: #667eea"
-                        >95%</span
-                      >
-                    </div>
-                  </div> -->
+            <!-- Left column: Number of Racers -->
+            <div class="input-group" style="margin: 0">
+              <label for="duckCount" style="font-size: 16px; font-weight: bold"
+                >Number of Racers:</label
+              >
+              <input
+                type="number"
+                id="duckCount"
+                min="10"
+                max="10000"
+                value="300"
+                style="
+                  font-size: 18px;
+                  padding: 12px;
+                  font-weight: bold;
+                  width: 100%;
+                "
+              />
+            </div>
 
-              <!-- <div style="display: flex; flex-direction: column; gap: 5px">
-                    <label style="font-size: 14px; color: #fff"
-                      >Card Gap:</label
-                    >
-                    <div style="display: flex; align-items: center; gap: 8px">
-                      <input
-                        type="range"
-                        id="cardGap"
-                        min="0.5"
-                        max="3"
-                        step="0.5"
-                        value="1.5"
-                        style="flex: 1"
-                      />
-                      <span
-                        id="cardGapValue"
-                        style="min-width: 40px; font-size: 14px; color: #667eea"
-                        >1.5%</span
-                      >
-                    </div>
-                  </div> -->
+            <!-- Right column: Racer List File -->
+            <div class="input-group" style="margin: 0">
+              <label
+                for="duckNamesFile"
+                id="fileLabel"
+                style="font-size: 16px; font-weight: bold; color: #fff"
+              >
+                Racer List File (CSV/Excel):
+              </label>
+              <div style="display: flex; gap: 10px; align-items: center">
+                <input
+                  type="file"
+                  id="duckNamesFile"
+                  accept=".csv,.xlsx,.xls"
+                  onchange="game.loadDuckNames(event)"
+                  style="
+                    flex: 1;
+                    font-size: 16px;
+                    padding: 12px;
+                    cursor: pointer;
+                    border: 2px dashed #667eea;
+                    border-radius: 8px;
+                    background: rgba(0, 0, 0, 0.3);
+                  "
+                />
+                <button
+                  onclick="game.clearLoadedFile()"
+                  id="clearFileBtn"
+                  class="btn btn-warning"
+                  style="display: none; padding: 12px 20px; font-size: 16px"
+                >
+                  🗑️ Clear
+                </button>
+              </div>
+              <small
+                style="
+                  color: #ccc;
+                  display: block;
+                  margin-top: 8px;
+                  font-size: 14px;
+                "
+              >
+              </small>
             </div>
           </div>
+        </div>
+
+        <!-- Audio Settings Section -->
+        <div
+          style="
+            margin: 20px 0;
+            padding: 18px;
+            background: rgba(46, 213, 115, 0.1);
+            border: 1px solid #2ed573;
+            border-radius: 10px;
+          "
+        >
+          <h3
+            style="
+              color: #2ed573;
+              margin: 0 0 12px 0;
+              font-size: 17px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            "
+          >
+            🔊 Âm thanh
+          </h3>
+
+          <!-- Two column layout for Enable Sound and Custom Race Sound -->
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 20px;
+              align-items: start;
+            "
+          >
+            <!-- Left column: Enable Sound -->
+            <div class="input-group" style="margin: 0">
+              <label
+                for="soundToggle"
+                style="
+                  font-size: 17px;
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  cursor: pointer;
+                  padding: 10px;
+                  background: rgba(0, 0, 0, 0.2);
+                  border-radius: 6px;
+                  border: 1px solid #2ed573;
+                "
+              >
+                <input
+                  type="checkbox"
+                  id="soundToggle"
+                  checked
+                  style="width: 24px; height: 24px; cursor: pointer"
+                />
+                <span style="font-weight: 600">Enable Sound</span>
+              </label>
+            </div>
+
+            <!-- Right column: Custom Race Sound -->
+            <div class="input-group" style="margin: 0">
+              <label
+                for="customSoundFile"
+                id="audioFileLabel"
+                style="font-size: 15px; font-weight: 500"
+                >Custom Race Sound (MP3):</label
+              >
+              <div style="display: flex; gap: 10px; align-items: center">
+                <input
+                  type="file"
+                  id="customSoundFile"
+                  accept=".mp3,.wav,.ogg"
+                  style="
+                    flex: 1;
+                    padding: 10px;
+                    font-size: 14px;
+                    border: 1px solid #2ed573;
+                    border-radius: 6px;
+                    background: rgba(0, 0, 0, 0.2);
+                  "
+                />
+                <button
+                  onclick="game.clearAudioFile()"
+                  id="clearAudioBtn"
+                  class="btn btn-warning"
+                  style="display: none; padding: 10px 16px; font-size: 14px"
+                >
+                  🗑️ Clear
+                </button>
+              </div>
+              <small
+                style="
+                  color: #2ed573;
+                  display: block;
+                  margin-top: 5px;
+                  font-weight: 500;
+                "
+              >
+                <br />
+                <strong style="color: #ffd700"></strong>
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Display Settings Section -->
+        <div
+          style="
+            margin: 20px 0;
+            padding: 18px;
+            background: rgba(255, 159, 64, 0.1);
+            border: 1px solid #ff9f40;
+            border-radius: 10px;
+          "
+        >
+          <h3
+            style="
+              color: #ff9f40;
+              margin: 0 0 12px 0;
+              font-size: 17px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            "
+          >
+            🖥️ Cài đặt màn hình
+          </h3>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <label style="font-size: 15px; color: #fff; font-weight: 500"
+              >Race Track Aspect Ratio:</label
+            >
+            <input
+              type="text"
+              id="raceTrackAspectRatio"
+              value="20:5"
+              placeholder="e.g., 16:9, 30:9, 21:9"
+              style="
+                padding: 12px;
+                background: rgba(0, 0, 0, 0.3);
+                border: 1px solid #ff9f40;
+                border-radius: 6px;
+                color: #fff;
+                font-size: 16px;
+              "
+              oninput="validateAspectRatioInput(this)"
+            />
+            <small style="color: #888; font-size: 13px">
+              Format: width:height (e.g., 16:9, 30:9)
+            </small>
+          </div>
+
+          <div
+            class="input-group"
+            style="margin-top: 15px; display: flex; gap: 10px"
+          >
+            <button
+              class="btn btn-small"
+              onclick="game.applyResultPanelSettings()"
+              style="
+                background: #667eea;
+                flex: 1;
+                padding: 12px;
+                font-size: 15px;
+              "
+            >
+              ✓ Apply
+            </button>
+            <button
+              class="btn btn-small"
+              onclick="game.resetResultPanelSettings()"
+              style="background: #888; flex: 1; padding: 12px; font-size: 15px"
+            >
+              ⟲ Reset
+            </button>
+          </div>
+
+          <!-- Open Display Button -->
           <div class="input-group" style="margin-top: 20px">
             <a
               href="display.html"
@@ -563,82 +529,27 @@
               id="openDisplayBtn"
               style="
                 width: 100%;
+                padding: 18px;
+                font-size: 20px;
+                font-weight: bold;
                 margin-bottom: 10px;
                 text-align: center;
                 text-decoration: none;
                 display: inline-block;
                 pointer-events: none;
                 opacity: 0.5;
+                background: linear-gradient(135deg, #667eea, #764ba2);
+                border: none;
+                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
               "
             >
               ⏳ Loading Icons...
             </a>
-            <small style="color: #ffd700; font-weight: bold">📺 </small><br />
-            <small style="color: #888"></small>
-          </div>
-        </div>
-        <!-- end game settings -->
-
-        <!-- Result Panel Preview - Independent -->
-        <div class="result-panel" id="resultPanel" style="margin-top: 30px">
-          <h2 id="resultTitle">Results</h2>
-          <div id="resultMessage"></div>
-        </div>
-
-        <script>
-          // Update slider values display
-          document
-            .getElementById("winnersGridWidth")
-            .addEventListener("input", (e) => {
-              document.getElementById("winnersGridWidthValue").textContent =
-                e.target.value + "%";
-            });
-          document.getElementById("cardGap").addEventListener("input", (e) => {
-            document.getElementById("cardGapValue").textContent =
-              e.target.value + "%";
-          });
-
-          // Validate aspect ratio input format
-          function validateAspectRatioInput(input) {
-            const value = input.value.trim();
-            // Allow digits, colon, and spaces
-            const cleaned = value.replace(/[^0-9:]/g, "");
-            if (cleaned !== value) {
-              input.value = cleaned;
-            }
-
-            // Check if format is valid (e.g., "16:9", "30:9")
-            const match = cleaned.match(/^(\d+):(\d+)$/);
-            if (match) {
-              input.style.borderColor = "#667eea";
-              input.style.background = "rgba(0,0,0,0.3)";
-            } else if (cleaned.length > 0) {
-              input.style.borderColor = "#ff6b6b";
-              input.style.background = "rgba(255,107,107,0.1)";
-            } else {
-              input.style.borderColor = "#667eea";
-              input.style.background = "rgba(0,0,0,0.3)";
-            }
-          }
-        </script>
-
-        <!-- Race Info (for control window) -->
-        <div
-          class="race-info"
-          id="raceInfo"
-          style="margin-top: 20px; position: relative"
-        >
-          <div class="info-item">
-            <span class="label">Race:</span>
-            <span id="raceNumber" class="value">#1</span>
-          </div>
-          <div class="info-item">
-            <span class="label">Time Left:</span>
-            <span id="timeLeft" class="value">30s</span>
-          </div>
-          <div class="info-item">
-            <span class="label">Status:</span>
-            <span id="raceStatus" class="value">Waiting</span>
+            <small
+              style="color: #ffd700; font-weight: bold; font-size: 15px"
+            ></small
+            ><br />
+            <small style="color: #888; font-size: 13px"></small>
           </div>
         </div>
 
@@ -655,9 +566,22 @@
             flex-wrap: wrap;
           "
         >
-          <button class="btn btn-small" onclick="game.goHome()" id="homeBtn">
+          <!-- <button class="btn btn-small" onclick="game.goHome()" id="homeBtn">
             🏠 Home
-          </button>
+          </button> -->
+          <div class="input-group">
+            <label for="raceDuration" style="font-size: 16px; font-weight: bold"
+              >Race Duration (seconds):</label
+            >
+            <input
+              type="number"
+              id="raceDuration"
+              min="5"
+              max="300"
+              value="30"
+              style="font-size: 18px; padding: 12px; font-weight: bold"
+            />
+          </div>
           <button
             class="btn btn-small"
             onclick="game.controlStartRace()"
@@ -690,85 +614,70 @@
             🎯 Next Race
           </button>
           <button
+            class="btn btn-primary"
+            onclick="game.nextRace()"
+            id="nextRaceBtn"
+            style="display: none; background: #3498db"
+          >
+            ➡️ Next Race
+          </button>
+          <button
             class="btn btn-secondary"
             onclick="game.showWinnersPanel()"
             id="viewResultsBtn"
           >
             📋 View Results
           </button>
+          <button
+            class="btn btn-secondary"
+            onclick="game.resetHistory()"
+            id="resetHistoryBtn"
+            style="background: #e74c3c"
+          >
+            🔄 Restart
+          </button>
         </div>
         <!-- end control panel -->
       </div>
-      <!-- end main container -->
+      <!-- end game settings -->
 
-      <!-- Toast Notification Container -->
+      <!-- Race Info (for control window) -->
       <div
-        id="toastContainer"
-        style="
-          position: fixed;
-          bottom: 20px;
-          left: 50%;
-          transform: translateX(-50%);
-          z-index: 10000;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          pointer-events: none;
-        "
-      ></div>
-      <!-- end toast notification container -->
-
-      <!-- Victory Popup (outside container for max z-index) -->
-      <div class="victory-popup" id="victoryPopup">
-        <div class="victory-overlay" onclick="game.closeVictoryPopup()"></div>
-        <div class="victory-content">
-          <div class="victory-header">
-            <h1>🎉 VICTORY! 🎉</h1>
-          </div>
-          <div class="victory-body">
-            <div class="winner-icon" id="winnerIcon"></div>
-            <h2 class="winner-name" id="winnerName">Winner Name</h2>
-            <div class="winner-stats" id="winnerStats"></div>
-          </div>
-          <div class="victory-footer" style="display: none">
-            <button class="btn btn-primary" onclick="game.continueRace()">
-              🎯 Continue (Next Race)
-            </button>
-            <button
-              class="btn btn-secondary"
-              onclick="
-                game.closeVictoryPopup();
-                game.showWinnersPanel();
-              "
-            >
-              📋 View Results
-            </button>
-          </div>
+        class="race-info"
+        id="raceInfo"
+        style="margin-top: 20px; position: relative"
+      >
+        <div class="info-item">
+          <span class="label">Race:</span>
+          <span id="raceNumber" class="value">#1</span>
+        </div>
+        <div class="info-item">
+          <span class="label">Time Left:</span>
+          <span id="timeLeft" class="value">30s</span>
+        </div>
+        <div class="info-item">
+          <span class="label">Status:</span>
+          <span id="raceStatus" class="value">Waiting</span>
         </div>
       </div>
-      <!-- end victory popup -->
+
       <!-- Result Panel Settings - Collapsible -->
-      <div class="result-panel-settings" style="margin-top: 30px">
-        <div
-          style="
-            margin-top: 30px;
-            border-top: 2px solid rgba(255, 255, 255, 0.2);
-            padding-top: 20px;
-          "
-        >
+      <div class="result-panel-settings">
+        <div>
           <div style="display: flex; justify-content: center">
             <button
               class="btn btn-small"
               onclick="game.toggleResultPanelSettings()"
-              style="background: #bde410; width: auto"
+              style="background: #686964; width: auto"
             >
-              ⚙️ Cài đặt hiển thị kết quả
+              ⚙️ Result Panel Settings
             </button>
           </div>
 
           <div
             id="resultPanelSettingsContainer"
             style="
+              display: none;
               margin-top: 15px;
               padding: 15px;
               background: rgba(102, 126, 234, 0.1);
@@ -779,13 +688,15 @@
               class="main-panel-prize-settings"
               style="font-size: 14px; color: #fff; margin-bottom: 10px"
             >
+              Prize Panel Settings
+
               <div class="input-group">
-                <label for="prizeTitleInput">Tiêu đề giải thưởng:</label>
+                <label for="prizeTitleInput">Prize Title:</label>
                 <input
                   type="text"
                   id="prizeTitleInput"
-                  placeholder="Kết quả giải thưởng"
-                  value="Kết quả giải thưởng"
+                  placeholder="Prize Results"
+                  value="Prize Results"
                   maxlength="50"
                   style="
                     padding: 8px;
@@ -1114,65 +1025,230 @@
               </div>
             </div>
             <!-- Result Panel Background Settings -->
-            <div class="input-group">
-              <label for="resultBgType">Background Type:</label>
-              <select
-                id="resultBgType"
-                onchange="game.toggleResultBackground()"
-              >
-                <option value="default">Default</option>
-                <option value="color">Solid Color</option>
-                <option value="image">Custom Image</option>
-              </select>
-            </div>
-
             <div
-              class="input-group"
-              id="resultBgColorGroup"
-              style="display: none"
+              class="main-panel-background-settings"
+              style="font-size: 14px; color: #fff; margin: 20px 0 10px 0"
             >
-              <label for="resultBgColor">Background Color:</label>
-              <input type="color" id="resultBgColor" value="#1a1a2e" />
-            </div>
+              Background Settings
 
-            <div
-              class="input-group"
-              id="resultBgImageGroup"
-              style="display: none"
-            >
-              <label for="resultBgImage">Background Image:</label>
-              <input
-                type="file"
-                id="resultBgImage"
-                accept="image/*"
-                onchange="game.loadResultBackgroundImage(event)"
-              />
-              <small style="color: #888">Upload JPG, PNG, or GIF</small>
-            </div>
-            <div class="input-group">
-              <button
-                class="btn btn-small"
-                onclick="game.applyResultPanelSettings()"
-                style="background: #667eea; margin-right: 10px"
+              <div class="input-group">
+                <label for="resultBgType">Background Type:</label>
+                <select
+                  id="resultBgType"
+                  onchange="game.toggleResultBackground()"
+                >
+                  <option value="default">Default</option>
+                  <option value="color">Solid Color</option>
+                  <option value="image">Custom Image</option>
+                </select>
+              </div>
+
+              <div
+                class="input-group"
+                id="resultBgColorGroup"
+                style="display: none"
               >
-                ✓ Apply
-              </button>
-              <button
-                class="btn btn-small"
-                onclick="game.resetResultPanelSettings()"
-                style="background: #888"
+                <label for="resultBgColor">Background Color:</label>
+                <input type="color" id="resultBgColor" value="#1a1a2e" />
+              </div>
+
+              <div
+                class="input-group"
+                id="resultBgImageGroup"
+                style="display: none"
               >
-                ⟲ Reset
-              </button>
+                <label for="resultBgImage">Background Image:</label>
+                <input
+                  type="file"
+                  id="resultBgImage"
+                  accept="image/*"
+                  onchange="game.loadResultBackgroundImage(event)"
+                />
+                <small style="color: #888">Upload JPG, PNG, or GIF</small>
+              </div>
+
+              <div
+                style="
+                  margin-top: 15px;
+                  padding: 10px;
+                  background: rgba(102, 126, 234, 0.1);
+                  border-radius: 5px;
+                "
+              >
+                <h4 style="color: #667eea; font-size: 16px; margin: 0 0 10px 0">
+                  📐 Layout Settings
+                </h4>
+                <div
+                  style="
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 10px;
+                  "
+                >
+                  <div style="display: flex; flex-direction: column; gap: 5px">
+                    <label style="font-size: 14px; color: #fff"
+                      >Winners Grid Width:</label
+                    >
+                    <div style="display: flex; align-items: center; gap: 8px">
+                      <input
+                        type="range"
+                        id="winnersGridWidth"
+                        min="70"
+                        max="100"
+                        value="95"
+                        style="flex: 1"
+                      />
+                      <span
+                        id="winnersGridWidthValue"
+                        style="min-width: 40px; font-size: 14px; color: #667eea"
+                        >95%</span
+                      >
+                    </div>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 5px">
+                    <label style="font-size: 14px; color: #fff"
+                      >Card Gap:</label
+                    >
+                    <div style="display: flex; align-items: center; gap: 8px">
+                      <input
+                        type="range"
+                        id="cardGap"
+                        min="0.5"
+                        max="3"
+                        step="0.5"
+                        value="1.5"
+                        style="flex: 1"
+                      />
+                      <span
+                        id="cardGapValue"
+                        style="min-width: 40px; font-size: 14px; color: #667eea"
+                        >1.5%</span
+                      >
+                    </div>
+                  </div>
+                </div>
+                <small style="color: #888; margin-top: 8px; display: block"
+                  >Adjust race track dimensions and winner card layout</small
+                >
+              </div>
+
+              <div class="input-group">
+                <button
+                  class="btn btn-small"
+                  onclick="game.applyResultPanelSettings()"
+                  style="background: #667eea; margin-right: 10px"
+                >
+                  ✓ Apply
+                </button>
+                <button
+                  class="btn btn-small"
+                  onclick="game.resetResultPanelSettings()"
+                  style="background: #888"
+                >
+                  ⟲ Reset
+                </button>
+              </div>
+              <!-- end layout settings -->
             </div>
-            <!-- end layout settings -->
           </div>
+          <!-- end main panel settings container -->
         </div>
-        <!-- end main panel settings container -->
+        <!-- end collapsible -->
       </div>
-      <!-- end collapsible -->
+      <!-- end main panel settings -->
+
+      <!-- Result Panel Preview - Independent -->
+      <div class="result-panel" id="resultPanel" style="margin-top: 30px">
+        <h2 id="resultTitle">Results</h2>
+        <div id="resultMessage"></div>
+      </div>
+
+      <script>
+        // Update slider values display
+        document
+          .getElementById("winnersGridWidth")
+          .addEventListener("input", (e) => {
+            document.getElementById("winnersGridWidthValue").textContent =
+              e.target.value + "%";
+          });
+        document.getElementById("cardGap").addEventListener("input", (e) => {
+          document.getElementById("cardGapValue").textContent =
+            e.target.value + "%";
+        });
+
+        // Validate aspect ratio input format
+        function validateAspectRatioInput(input) {
+          const value = input.value.trim();
+          // Allow digits, colon, and spaces
+          const cleaned = value.replace(/[^0-9:]/g, "");
+          if (cleaned !== value) {
+            input.value = cleaned;
+          }
+
+          // Check if format is valid (e.g., "16:9", "30:9")
+          const match = cleaned.match(/^(\d+):(\d+)$/);
+          if (match) {
+            input.style.borderColor = "#667eea";
+            input.style.background = "rgba(0,0,0,0.3)";
+          } else if (cleaned.length > 0) {
+            input.style.borderColor = "#ff6b6b";
+            input.style.background = "rgba(255,107,107,0.1)";
+          } else {
+            input.style.borderColor = "#667eea";
+            input.style.background = "rgba(0,0,0,0.3)";
+          }
+        }
+      </script>
     </div>
-    <!-- end main panel settings -->
+    <!-- end main container -->
+
+    <!-- Toast Notification Container -->
+    <div
+      id="toastContainer"
+      style="
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        pointer-events: none;
+      "
+    ></div>
+    <!-- end toast notification container -->
+
+    <!-- Victory Popup (outside container for max z-index) -->
+    <div class="victory-popup" id="victoryPopup">
+      <div class="victory-overlay" onclick="game.closeVictoryPopup()"></div>
+      <div class="victory-content">
+        <div class="victory-header">
+          <h1>🎉 VICTORY! 🎉</h1>
+        </div>
+        <div class="victory-body">
+          <div class="winner-icon" id="winnerIcon"></div>
+          <h2 class="winner-name" id="winnerName">Winner Name</h2>
+          <div class="winner-stats" id="winnerStats"></div>
+        </div>
+        <div class="victory-footer" style="display: none">
+          <button class="btn btn-primary" onclick="game.continueRace()">
+            🎯 Continue (Next Race)
+          </button>
+          <button
+            class="btn btn-secondary"
+            onclick="
+              game.closeVictoryPopup();
+              game.showWinnersPanel();
+            "
+          >
+            📋 View Results
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- end victory popup -->
+
     <!-- Top N Victory Popup -->
     <div class="victory-popup" id="topNVictoryPopup">
       <div class="victory-overlay" onclick="game.closeTopNVictoryPopup()"></div>
@@ -1218,7 +1294,7 @@
     </div>
     <!-- end top N victory popup -->
 
-    <!-- Leaderboard -->
+    <!-- Leaderboard - Hidden -->
     <div class="history-win" id="historyWin">
       <h3>🏆 Victory History</h3>
       <div id="historyWinList"></div>
@@ -1234,7 +1310,7 @@
     <!-- SheetJS library for Excel file support -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 
-    <script type="module" src="game.js?v=61"></script>
+    <script type="module" src="game.js?v=66"></script>
     <script type="module">
       // Đăng nhập đơn giản: chỉ cần nhập username, lưu vào localStorage
       function showLogin() {
@@ -1562,6 +1638,10 @@
       setTimeout(() => {
         if (window.game && game.renderSimplePrizeUI) {
           game.renderSimplePrizeUI();
+        }
+        // Render race scripts to show existing scripts
+        if (window.game && game.renderRaceScripts) {
+          game.renderRaceScripts();
         }
       }, 500);
     </script>

@@ -1,1521 +1,1664 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Racing Display - Full Screen</title>
-    <link rel="stylesheet" href="style.css?v=43">
+    <link rel="stylesheet" href="style.css?v=43" />
     <style>
-        /* Custom butterfly cursor */
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background: #000;
-            cursor: none;
-        }
+      /* Custom butterfly cursor */
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #000;
+        cursor: none;
+      }
 
-        /* Butterfly cursor follower */
-        .butterfly-cursor {
-            position: fixed;
-            width: 40px;
-            height: 40px;
-            pointer-events: none;
-            z-index: 99999;
-            transform: translate(-50%, -50%);
-            font-size: 40px;
-            line-height: 1;
-            text-align: center;
-            animation: butterflyFlap 0.6s ease-in-out infinite;
-            transition: transform 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            filter: drop-shadow(0 2px 8px rgba(255, 255, 255, 0.3));
-        }
+      /* Butterfly cursor follower */
+      .butterfly-cursor {
+        position: fixed;
+        width: 40px;
+        height: 40px;
+        pointer-events: none;
+        z-index: 99999;
+        transform: translate(-50%, -50%);
+        font-size: 40px;
+        line-height: 1;
+        text-align: center;
+        animation: butterflyFlap 0.6s ease-in-out infinite;
+        transition: transform 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        filter: drop-shadow(0 2px 8px rgba(255, 255, 255, 0.3));
+      }
 
-        @keyframes butterflyFlap {
-            0%, 100% {
-                transform: translate(-50%, -50%) rotateZ(-5deg) scale(1);
-            }
-            50% {
-                transform: translate(-50%, -50%) rotateZ(5deg) scale(1.1);
-            }
+      @keyframes butterflyFlap {
+        0%,
+        100% {
+          transform: translate(-50%, -50%) rotateZ(-5deg) scale(1);
         }
+        50% {
+          transform: translate(-50%, -50%) rotateZ(5deg) scale(1.1);
+        }
+      }
 
-        /* Cursor trail effect */
-        .butterfly-trail {
-            position: fixed;
-            width: 20px;
-            height: 20px;
-            pointer-events: none;
-            z-index: 99998;
-            transform: translate(-50%, -50%);
-            opacity: 0;
-            transition: opacity 0.3s ease-out;
-        }
+      /* Cursor trail effect */
+      .butterfly-trail {
+        position: fixed;
+        width: 20px;
+        height: 20px;
+        pointer-events: none;
+        z-index: 99998;
+        transform: translate(-50%, -50%);
+        opacity: 0;
+        transition: opacity 0.3s ease-out;
+      }
 
-        .butterfly-trail::before {
-            content: '✨';
-            position: absolute;
-            font-size: 16px;
-            animation: trailFade 1s ease-out forwards;
-        }
+      .butterfly-trail::before {
+        content: "✨";
+        position: absolute;
+        font-size: 16px;
+        animation: trailFade 1s ease-out forwards;
+      }
 
-        @keyframes trailFade {
-            0% {
-                opacity: 0.8;
-                transform: scale(1) rotate(0deg);
-            }
-            100% {
-                opacity: 0;
-                transform: scale(0.3) rotate(180deg);
-            }
+      @keyframes trailFade {
+        0% {
+          opacity: 0.8;
+          transform: scale(1) rotate(0deg);
         }
-        
-        /* Full screen display mode */
-        
-        .display-container {
-            width: 100vw;
-            height: 100vh;
-            position: fixed;
-            top: 0;
-            left: 0;
+        100% {
+          opacity: 0;
+          transform: scale(0.3) rotate(180deg);
         }
-        
-        /* Hide all controls on display except result-panel */
-        .control-panel,
-        .settings-panel,
-        .history-win,
-        .history-panel,
-        .race-info {
-            display: none !important;
-        }
-        
-        /* Allow result-panel to show on display */
-        .result-panel {
-            display: none; /* hidden by default */
-            background: url('static/lucky.png') center center/cover no-repeat !important;
-        }
-        
-        .result-panel.fullscreen {
-            display: flex !important;
-            position: fixed !important;
-            top: 50% !important;
-            left: 50% !important;
-            transform: translate(-50%, -50%) !important;
-            width: 100vw !important;
-            height: calc(100vw * 5 / 20) !important; /* 20:5 aspect ratio (4:1) */
-            max-height: 100vh !important;
-            max-width: calc(100vh * 20 / 5) !important;
-            margin: 0 !important;
-            border-radius: 20px !important;
-            z-index: 9999 !important;
-            flex-direction: column !important;
-            justify-content: center !important;
-            align-items: center !important;
-            padding: 2% !important;
-            cursor: default !important;
-            overflow: hidden !important;
-            box-sizing: border-box !important;
-        }
-        
-        /* Hide pseudo-elements for result-panel on display */
-        .result-panel::before,
-        .result-panel::after {
-            display: none !important;
-        }
-        
-        /* Scale result panel children to parent size */
-        .result-panel.fullscreen #resultTitle {
-            font-size: 2.8em !important;
-            margin: 0 0 0.5em 0 !important;
-            flex-shrink: 0 !important;
-        }
-        
-        .result-panel.fullscreen .winners-list {
-            width: 100% !important;
-            display: flex !important;
-            flex-direction: column !important;
-            align-items: center !important;
-            justify-content: center !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            flex: 1 !important;
-            overflow: hidden !important;
-        }
-        
-        .result-panel.fullscreen .winners-grid {
-            display: flex !important;
-            flex-wrap: wrap !important;
-            justify-content: center !important;
-            align-items: stretch !important;
-            gap: 1.5% !important;
-            width: 100% !important;
-            max-width: 95% !important;
-            height: auto !important;
-            padding: 0 !important;
-            margin: 0 !important;
-        }
-        
-        .result-panel.fullscreen .winner-card {
-            flex: 1 1 0 !important;
-            min-width: 160px !important;
-            max-width: 200px !important;
-            width: 100% !important;
-            padding: 2% !important;
-            border-radius: 8px !important;
-            box-sizing: border-box !important;
-            display: flex !important;
-            flex-direction: column !important;
-            align-items: center !important;
-            justify-content: center !important;
-            aspect-ratio: 1 / 1.4 !important;
-        }
-        
-        .result-panel.fullscreen .winner-medal {
-            font-size: 2.5em !important;
-            margin: 0 0 0.2em 0 !important;
-            line-height: 1 !important;
-            flex-shrink: 0 !important;
-        }
-        
-        .result-panel.fullscreen .winner-position {
-            font-size: 0.75em !important;
-            margin: 0 0 0.2em 0 !important;
-            white-space: normal !important;
-            word-break: break-word !important;
-            text-align: center !important;
-            line-height: 1.3 !important;
-            width: 100% !important;
-            overflow: visible !important;
-            padding: 0 5% !important;
-        }
-        
-        .result-panel.fullscreen .winner-duck-name {
-            font-size: 0.9em !important;
-            margin: 0.2em 0 !important;
-            word-break: break-word !important;
-            text-align: center !important;
-            line-height: 1.3 !important;
-            width: 100% !important;
-            overflow: visible !important;
-            padding: 0 5% !important;
-        }
-        
-        .result-panel.fullscreen .result-actions {
-            margin-top: 1vh !important;
-            flex-shrink: 0 !important;
-            display: none !important;
-        }
-        
-        .result-panel.fullscreen .btn {
-            font-size: 1vw !important;
-            padding: 0.8vh 1.5vw !important;
-            margin: 0.3vh !important;
-        }
-        
-        /* Race info at top */
-        .race-info {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 100;
-            background: rgba(0,0,0,0.85);
-            padding: 15px 40px;
-            border-radius: 15px;
-            display: flex;
-            gap: 40px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-        }
-        
-        .race-info .info-item {
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
-        }
-        
-        .race-info .label {
-            color: #FFD700;
-            margin-right: 10px;
-        }
-        
-        /* Big timer - Fixed in bank-top at 50% height */
-        .big-timer {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: transparent;
-            padding: 20px 30px;
-            border-radius: 15px;
-            height: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 20;
-        }
-        
-        .big-timer .timer-display {
-            font-size: 48px;
-            font-weight: bold;
-            color: #FFD700;
-            font-family: 'Courier New', monospace;
-        }
-        
-        /* Race track full screen with 20:5 aspect ratio */
-        .race-track {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 100vw;
-            height: calc(100vw * 5 / 20); /* 20:5 aspect ratio (4:1) */
-            max-height: 100vh;
-            max-width: calc(100vh * 20 / 5);
-            z-index: 10;
-        }
-        
-        /* Loading indicator - scaled to match race-track */
-        .loading-display {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 100vw;
-            height: calc(100vw * 5 / 20); /* Match race-track aspect ratio */
-            max-height: 100vh;
-            max-width: calc(100vh * 20 / 5);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            color: white;
-            font-size: 32px;
-            z-index: 1000;
-            background: rgba(0, 0, 0, 0.8);
-            border-radius: 20px;
-            padding: 20px;
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4),
-                        inset 0 0 50px rgba(0, 0, 0, 0.3),
-                        0 0 50px rgba(102, 126, 234, 0.3);
-        }
-        
-        .loading-display h1 {
-            color: #FFD700;
-            font-size: 3vw; /* Responsive to viewport width */
-            margin-bottom: 20px;
-        }
-        
-        .loading-display p {
-            font-size: 1.5vw; /* Responsive to viewport width */
-        }
-        
-        /* Victory popup scaled to match race-track - ENTIRE POPUP */
-        .victory-popup {
-            position: fixed !important;
-            top: 50% !important;
-            left: 50% !important;
-            transform: translate(-50%, -50%) !important;
-            width: 100vw !important;
-            height: calc(100vw * 5 / 20) !important; /* Match race-track aspect ratio */
-            max-height: 100vh !important;
-            max-width: calc(100vh * 20 / 5) !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            background: linear-gradient(135deg, #ffe259 0%, #f6d365 100%) !important; /* Vàng sáng */
-        }
-        
-        /* Victory overlay - fill entire popup container */
-        .victory-overlay {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            border-radius: 20px !important;
-        }
-        
-        /* Victory content - circular shape, diameter = height of race-track */
-        .victory-content {
-            width: auto !important;
-            height: 100% !important;
-            aspect-ratio: 1 / 1 !important; /* Force square based on height */
-            border-radius: 50% !important; /* Make it circular */
-            padding: 0 !important;
-            background: linear-gradient(135deg, #ff512f 0%, #f09819 100%) !important; /* Đỏ cam */
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4),
-                        inset 0 0 50px rgba(0, 0, 0, 0.3),
-                        0 0 50px rgba(102, 126, 234, 0.3) !important;
-            overflow: visible !important;
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: center !important;
-            align-items: center !important;
-        }
-        
-        /* Victory header - compact */
-        .victory-header {
-            flex-shrink: 0 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            text-align: center !important;
-            width: 100% !important;
-        }
-        
-        .victory-header h1 {
-            font-size: clamp(1.8em, 3vw, 2.5em) !important;
-            margin: 0 0 2% 0 !important;
-            animation: victoryShake 0.5s ease-in-out infinite !important;
-        }
-        
-        /* Victory body - vertical layout for circular shape */
-        .victory-body {
-            padding: 3% !important;
-            margin: 0 !important;
-            margin-bottom: 3% !important;
-            border-radius: 50% !important;
-            width: auto !important;
-            height: 90% !important;
-            aspect-ratio: 1 / 1 !important;
-            flex-shrink: 0 !important;
-            display: flex !important;
-            flex-direction: column !important;
-            align-items: center !important;
-            justify-content: center !important;
-            transform: translateY(-5%) !important;
-        }
-        
-        /* Winner icon - compact */
-        .winner-icon {
-            width: 45% !important;
-            height: 45% !important;
-            max-width: none !important;
-            max-height: none !important;
-            margin: 0 auto 2% !important;
-            flex-shrink: 0 !important;
-            animation: winnerSpin 2s ease-in-out infinite !important;
-        }
-        
-        .winner-name {
-            font-size: 2.5em !important;
-            margin: 2% 0 !important;
-            text-align: center !important;
-            font-weight: bold !important;
-        }
-        
-        .winner-stats {
-            font-size: 1.4em !important;
-            line-height: 1.8 !important;
-            text-align: center !important;
-        }
-        
-        .winner-stats p {
-            margin: 1.5% 0 !important;
-        }
-        
-        /* Victory footer - compact */
-        .victory-footer {
-            margin-top: 2% !important;
-            flex-shrink: 0 !important;
-            gap: 2% !important;
-        }
-        
-        .victory-footer .btn {
-            font-size: clamp(0.8em, 2vw, 1.1em) !important;
-            padding: 2% 5% !important;
-        }
+      }
 
-        /* Top N Victory Popup - Display Mode Styles */
-        .victory-content-topn {
-            width: 95% !important;
-            height: 90% !important;
-            aspect-ratio: auto !important;
-            border-radius: 20px !important;
-            padding: 1.5% !important;
-            background: linear-gradient(135deg, #ff512f 0%, #f09819 100%) !important; /* Đỏ cam */
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4),
-                        inset 0 0 50px rgba(0, 0, 0, 0.3),
-                        0 0 50px rgba(102, 126, 234, 0.3) !important;
-            display: flex !important;
-            flex-direction: column !important;
-            overflow: hidden !important;
-        }
+      /* Full screen display mode */
 
-        .victory-content-topn .victory-header {
-            flex-shrink: 0 !important;
-            margin-bottom: 0.5% !important;
-        }
+      .display-container {
+        width: 100vw;
+        height: 100vh;
+        position: fixed;
+        top: 0;
+        left: 0;
+      }
 
-        .victory-content-topn .victory-header h1 {
-            font-size: clamp(1.2em, 2vw, 1.8em) !important;
-            margin: 0 !important;
-        }
+      /* Hide all controls on display except result-panel */
+      .control-panel,
+      .settings-panel,
+      .history-win,
+      .history-panel,
+      .race-info {
+        display: none !important;
+      }
 
-        .victory-body-topn {
-            background: transparent !important;
-            padding: 0.5% !important;
-            margin: 0 !important;
-            width: 100% !important;
-            flex: 1 !important;
-            display: flex !important;
-            flex-direction: row !important;
-            flex-wrap: wrap !important;
-            justify-content: center !important;
-            align-items: center !important;
-            align-content: center !important;
-            gap: 1% !important;
-            overflow: hidden !important;
-        }
+      /* Allow result-panel to show on display */
+      .result-panel {
+        display: none; /* hidden by default */
+        background: url("static/lucky.png") center center/cover no-repeat !important;
+      }
 
-        .topn-winner-card {
-            background: rgba(255, 255, 255, 0.95) !important;
-            border-radius: 12px !important;
-            padding: 1% !important;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2) !important;
-            display: flex !important;
-            flex-direction: column !important;
-            align-items: center !important;
-            justify-content: center !important;
-            gap: 0.3em !important;
-            flex: 0 1 auto !important;
-            min-width: 100px !important;
-            max-width: 150px !important;
-            width: auto !important;
-            height: auto !important;
-        }
+      .result-panel.fullscreen {
+        display: flex !important;
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        width: 100vw !important;
+        height: calc(100vw * 5 / 20) !important; /* 20:5 aspect ratio (4:1) */
+        max-height: 100vh !important;
+        max-width: calc(100vh * 20 / 5) !important;
+        margin: 0 !important;
+        border-radius: 20px !important;
+        z-index: 9999 !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        align-items: center !important;
+        padding: 2% !important;
+        cursor: default !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+      }
 
-        .topn-winner-card:hover {
-            transform: translateY(-5px) scale(1.05) !important;
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.5) !important;
-        }
+      /* Hide pseudo-elements for result-panel on display */
+      .result-panel::before,
+      .result-panel::after {
+        display: none !important;
+      }
 
-        .topn-winner-medal {
-            font-size: clamp(1.5em, 3vw, 2.5em) !important;
-            margin: 0.1em 0 !important;
-            line-height: 1 !important;
-            animation: winnerSpin 2s ease-in-out infinite !important;
-            flex-shrink: 0 !important;
-        }
+      /* Scale result panel children to parent size */
+      .result-panel.fullscreen #resultTitle {
+        font-size: 2.8em !important;
+        margin: 0 0 0.5em 0 !important;
+        flex-shrink: 0 !important;
+      }
 
-        .topn-winner-icon {
-            width: clamp(40px, 5vw, 60px) !important;
-            height: clamp(40px, 5vw, 60px) !important;
-            margin: 0.2em 0 !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            flex-shrink: 0 !important;
-        }
+      .result-panel.fullscreen .winners-list {
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        flex: 1 !important;
+        overflow: hidden !important;
+      }
 
-        .topn-winner-icon img {
-            max-width: 100% !important;
-            max-height: 100% !important;
-            object-fit: contain !important;
-            filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.3)) !important;
-        }
+      .result-panel.fullscreen .winners-grid {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        justify-content: center !important;
+        align-items: stretch !important;
+        gap: 1.5% !important;
+        width: 100% !important;
+        max-width: 95% !important;
+        height: auto !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
 
-        .topn-winner-position {
-            font-size: clamp(0.75em, 1.1vw, 0.95em) !important;
-            font-weight: bold !important;
-            color: #667eea !important;
-            margin: 0.2em 0 !important;
-            text-align: center !important;
-            white-space: normal !important;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-            line-height: 1.2 !important;
-        }
+      .result-panel.fullscreen .winner-card {
+        flex: 1 1 0 !important;
+        min-width: 160px !important;
+        max-width: 200px !important;
+        width: 100% !important;
+        padding: 2% !important;
+        border-radius: 8px !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        aspect-ratio: 1 / 1.4 !important;
+      }
 
-        .topn-winner-name {
-            font-size: clamp(0.7em, 1vw, 0.85em) !important;
-            font-weight: 600 !important;
-            color: #333 !important;
-            margin: 0.2em 0 !important;
-            text-align: center !important;
-            word-break: break-word !important;
-            line-height: 1.3 !important;
-            max-width: 100% !important;
-        }
+      .result-panel.fullscreen .winner-medal {
+        font-size: 2.5em !important;
+        margin: 0 0 0.2em 0 !important;
+        line-height: 1 !important;
+        flex-shrink: 0 !important;
+      }
 
-        /* Close button positioned below race-track */
-        .topn-close-btn {
-            position: fixed !important;
-            bottom: 3vh !important;
-            left: 50% !important;
-            transform: translateX(-50%) !important;
-            font-size: clamp(1em, 2vw, 1.5em) !important;
-            padding: 1% 3% !important;
-            z-index: 10001 !important;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4) !important;
-        }
+      .result-panel.fullscreen .winner-position {
+        font-size: 0.75em !important;
+        margin: 0 0 0.2em 0 !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+        text-align: center !important;
+        line-height: 1.3 !important;
+        width: 100% !important;
+        overflow: visible !important;
+        padding: 0 5% !important;
+      }
 
-        .victory-content-topn .victory-footer {
-            display: none !important;
-        }
+      .result-panel.fullscreen .winner-duck-name {
+        font-size: 0.9em !important;
+        margin: 0.2em 0 !important;
+        word-break: break-word !important;
+        text-align: center !important;
+        line-height: 1.3 !important;
+        width: 100% !important;
+        overflow: visible !important;
+        padding: 0 5% !important;
+      }
+
+      .result-panel.fullscreen .result-actions {
+        margin-top: 1vh !important;
+        flex-shrink: 0 !important;
+        display: none !important;
+      }
+
+      .result-panel.fullscreen .btn {
+        font-size: 1vw !important;
+        padding: 0.8vh 1.5vw !important;
+        margin: 0.3vh !important;
+      }
+
+      /* Race info at top */
+      .race-info {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 100;
+        background: rgba(0, 0, 0, 0.85);
+        padding: 15px 40px;
+        border-radius: 15px;
+        display: flex;
+        gap: 40px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      }
+
+      .race-info .info-item {
+        color: white;
+        font-size: 24px;
+        font-weight: bold;
+      }
+
+      .race-info .label {
+        color: #ffd700;
+        margin-right: 10px;
+      }
+
+      /* Big timer - Fixed in bank-top at 50% height */
+      .big-timer {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: transparent;
+        padding: 20px 30px;
+        border-radius: 15px;
+        height: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 20;
+      }
+
+      .big-timer .timer-display {
+        font-size: 48px;
+        font-weight: bold;
+        color: #ffd700;
+        font-family: "Courier New", monospace;
+      }
+
+      /* Race track full screen with 20:5 aspect ratio */
+      .race-track {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 100vw;
+        height: calc(100vw * 5 / 20); /* 20:5 aspect ratio (4:1) */
+        max-height: 100vh;
+        max-width: calc(100vh * 20 / 5);
+        z-index: 10;
+      }
+
+      /* Loading indicator - scaled to match race-track */
+      .loading-display {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 100vw;
+        height: calc(100vw * 5 / 20); /* Match race-track aspect ratio */
+        max-height: 100vh;
+        max-width: calc(100vh * 20 / 5);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: white;
+        font-size: 32px;
+        z-index: 1000;
+        background: rgba(0, 0, 0, 0.8);
+        border-radius: 20px;
+        padding: 20px;
+        box-shadow:
+          0 15px 40px rgba(0, 0, 0, 0.4),
+          inset 0 0 50px rgba(0, 0, 0, 0.3),
+          0 0 50px rgba(102, 126, 234, 0.3);
+      }
+
+      .loading-display h1 {
+        color: #ffd700;
+        font-size: 3vw; /* Responsive to viewport width */
+        margin-bottom: 20px;
+      }
+
+      .loading-display p {
+        font-size: 1.5vw; /* Responsive to viewport width */
+      }
+
+      /* Victory popup scaled to match race-track - ENTIRE POPUP */
+      .victory-popup {
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        width: 100vw !important;
+        height: calc(
+          100vw * 5 / 20
+        ) !important; /* Match race-track aspect ratio */
+        max-height: 100vh !important;
+        max-width: calc(100vh * 20 / 5) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: linear-gradient(
+          135deg,
+          #ffe259 0%,
+          #f6d365 100%
+        ) !important; /* Vàng sáng */
+      }
+
+      /* Victory overlay - fill entire popup container */
+      .victory-overlay {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        border-radius: 20px !important;
+      }
+
+      /* Victory content - circular shape, diameter = height of race-track */
+      .victory-content {
+        width: auto !important;
+        height: 100% !important;
+        aspect-ratio: 1 / 1 !important; /* Force square based on height */
+        border-radius: 50% !important; /* Make it circular */
+        padding: 0 !important;
+        background: linear-gradient(
+          135deg,
+          #ff512f 0%,
+          #f09819 100%
+        ) !important; /* Đỏ cam */
+        box-shadow:
+          0 15px 40px rgba(0, 0, 0, 0.4),
+          inset 0 0 50px rgba(0, 0, 0, 0.3),
+          0 0 50px rgba(102, 126, 234, 0.3) !important;
+        overflow: visible !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        align-items: center !important;
+      }
+
+      /* Victory header - compact */
+      .victory-header {
+        flex-shrink: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        text-align: center !important;
+        width: 100% !important;
+      }
+
+      .victory-header h1 {
+        font-size: clamp(1.8em, 3vw, 2.5em) !important;
+        margin: 0 0 2% 0 !important;
+        animation: victoryShake 0.5s ease-in-out infinite !important;
+      }
+
+      /* Victory body - vertical layout for circular shape */
+      .victory-body {
+        padding: 3% !important;
+        margin: 0 !important;
+        margin-bottom: 3% !important;
+        border-radius: 50% !important;
+        width: auto !important;
+        height: 90% !important;
+        aspect-ratio: 1 / 1 !important;
+        flex-shrink: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transform: translateY(-5%) !important;
+      }
+
+      /* Winner icon - compact */
+      .winner-icon {
+        width: 45% !important;
+        height: 45% !important;
+        max-width: none !important;
+        max-height: none !important;
+        margin: 0 auto 2% !important;
+        flex-shrink: 0 !important;
+        animation: winnerSpin 2s ease-in-out infinite !important;
+      }
+
+      .winner-name {
+        font-size: 2.5em !important;
+        margin: 2% 0 !important;
+        text-align: center !important;
+        font-weight: bold !important;
+      }
+
+      .winner-stats {
+        font-size: 1.4em !important;
+        line-height: 1.8 !important;
+        text-align: center !important;
+      }
+
+      .winner-stats p {
+        margin: 1.5% 0 !important;
+      }
+
+      /* Victory footer - compact */
+      .victory-footer {
+        margin-top: 2% !important;
+        flex-shrink: 0 !important;
+        gap: 2% !important;
+      }
+
+      .victory-footer .btn {
+        font-size: clamp(0.8em, 2vw, 1.1em) !important;
+        padding: 2% 5% !important;
+      }
+
+      /* Top N Victory Popup - Display Mode Styles */
+      .victory-content-topn {
+        width: 95% !important;
+        height: 90% !important;
+        aspect-ratio: auto !important;
+        border-radius: 20px !important;
+        padding: 1.5% !important;
+        background: linear-gradient(
+          135deg,
+          #ff512f 0%,
+          #f09819 100%
+        ) !important; /* Đỏ cam */
+        box-shadow:
+          0 15px 40px rgba(0, 0, 0, 0.4),
+          inset 0 0 50px rgba(0, 0, 0, 0.3),
+          0 0 50px rgba(102, 126, 234, 0.3) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+      }
+
+      .victory-content-topn .victory-header {
+        flex-shrink: 0 !important;
+        margin-bottom: 0.5% !important;
+      }
+
+      .victory-content-topn .victory-header h1 {
+        font-size: clamp(1.2em, 2vw, 1.8em) !important;
+        margin: 0 !important;
+      }
+
+      .victory-body-topn {
+        background: transparent !important;
+        padding: 0.5% !important;
+        margin: 0 !important;
+        width: 100% !important;
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        justify-content: center !important;
+        align-items: center !important;
+        align-content: center !important;
+        gap: 1% !important;
+        overflow: hidden !important;
+      }
+
+      .topn-winner-card {
+        background: rgba(255, 255, 255, 0.95) !important;
+        border-radius: 12px !important;
+        padding: 1% !important;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 0.3em !important;
+        flex: 0 1 auto !important;
+        min-width: 100px !important;
+        max-width: 150px !important;
+        width: auto !important;
+        height: auto !important;
+      }
+
+      .topn-winner-card:hover {
+        transform: translateY(-5px) scale(1.05) !important;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.5) !important;
+      }
+
+      .topn-winner-medal {
+        font-size: clamp(1.5em, 3vw, 2.5em) !important;
+        margin: 0.1em 0 !important;
+        line-height: 1 !important;
+        animation: winnerSpin 2s ease-in-out infinite !important;
+        flex-shrink: 0 !important;
+      }
+
+      .topn-winner-icon {
+        width: clamp(40px, 5vw, 60px) !important;
+        height: clamp(40px, 5vw, 60px) !important;
+        margin: 0.2em 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex-shrink: 0 !important;
+      }
+
+      .topn-winner-icon img {
+        max-width: 100% !important;
+        max-height: 100% !important;
+        object-fit: contain !important;
+        filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.3)) !important;
+      }
+
+      .topn-winner-position {
+        font-size: clamp(0.75em, 1.1vw, 0.95em) !important;
+        font-weight: bold !important;
+        color: #667eea !important;
+        margin: 0.2em 0 !important;
+        text-align: center !important;
+        white-space: normal !important;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+        line-height: 1.2 !important;
+      }
+
+      .topn-winner-name {
+        font-size: clamp(0.7em, 1vw, 0.85em) !important;
+        font-weight: 600 !important;
+        color: #333 !important;
+        margin: 0.2em 0 !important;
+        text-align: center !important;
+        word-break: break-word !important;
+        line-height: 1.3 !important;
+        max-width: 100% !important;
+      }
+
+      /* Close button positioned below race-track */
+      .topn-close-btn {
+        position: fixed !important;
+        bottom: 3vh !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        font-size: clamp(1em, 2vw, 1.5em) !important;
+        padding: 1% 3% !important;
+        z-index: 10001 !important;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4) !important;
+      }
+
+      .victory-content-topn .victory-footer {
+        display: none !important;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <!-- Butterfly cursor element -->
     <div class="butterfly-cursor" id="butterflyCursor">🦋</div>
-    
-    <div class="display-container">
-        <!-- Loading Message -->
-        <div class="loading-display" id="loadingDisplay">
-            <h1>🏁 Racing Display 🏁</h1>
-            <p style="font-size: 24px; margin-top: 20px;">⏳ Loading icons...</p>
-            <p style="font-size: 18px; color: #888; margin-top: 30px;">
-                📺 Keep this tab open for display<br>
-                🎮 Use the control tab to start race
-            </p>
-        </div>
-        
-        <!-- No race info on display - all controls are on index.html -->
 
-        <!-- Race Track -->
-        <div class="race-track" id="raceTrack">
-            <div class="bank-top" id="bankTop">
-                <!-- Big Timer Display - Fixed inside bank-top at 50% height -->
-                <div class="big-timer hidden" id="bigTimer">
-                    <div class="timer-display">00:00:00</div>
-                </div>
-            </div>
-            <div class="race-river" id="raceRiver">
-                <div class="water-flow"></div>
-                <div class="water-ripples"></div>
-                <div class="fish-layer" id="fishLayer">
-                    <div class="fish fish-1">🐟</div>
-                    <div class="fish fish-2">🐠</div>
-                    <div class="fish fish-3">🐡</div>
-                    <div class="fish fish-4">🐟</div>
-                    <div class="fish fish-5">🐠</div>
-                </div>
-                <!-- Ducks will be added here dynamically -->
-            </div>
-            <div class="bank-bot" id="bankBot"></div>
-            <div class="finish-line hidden" id="finishLine"></div>
+    <div class="display-container">
+      <!-- Loading Message -->
+      <div class="loading-display" id="loadingDisplay">
+        <h1>🏁 Racing Display 🏁</h1>
+        <p style="font-size: 24px; margin-top: 20px">⏳ Loading icons...</p>
+        <p style="font-size: 18px; color: #888; margin-top: 30px">
+          📺 Keep this tab open for display<br />
+          🎮 Use the control tab to start race
+        </p>
+      </div>
+
+      <!-- No race info on display - all controls are on index.html -->
+
+      <!-- Race Track -->
+      <div class="race-track" id="raceTrack">
+        <div class="bank-top" id="bankTop">
+          <!-- Big Timer Display - Fixed inside bank-top at 50% height -->
+          <div class="big-timer hidden" id="bigTimer">
+            <div class="timer-display">00:00:00</div>
+          </div>
         </div>
-        
-        <!-- Result Panel (copy from index.html) -->
-        <div class="result-panel hidden" id="resultPanel">
-            <h2 id="resultTitle">Results</h2>
-            <div id="resultMessage"></div>
+        <div class="race-river" id="raceRiver">
+          <div class="water-flow"></div>
+          <div class="water-ripples"></div>
+          <div class="fish-layer" id="fishLayer">
+            <div class="fish fish-1">🐟</div>
+            <div class="fish fish-2">🐠</div>
+            <div class="fish fish-3">🐡</div>
+            <div class="fish fish-4">🐟</div>
+            <div class="fish fish-5">🐠</div>
+          </div>
+          <!-- Ducks will be added here dynamically -->
         </div>
+        <div class="bank-bot" id="bankBot"></div>
+        <div class="finish-line hidden" id="finishLine">FINISH</div>
+      </div>
+
+      <!-- Result Panel (copy from index.html) -->
+      <div class="result-panel hidden" id="resultPanel">
+        <h2 id="resultTitle">Results</h2>
+        <div id="resultMessage"></div>
+      </div>
     </div>
 
     <!-- Toast Notification Container -->
-    <div id="toastContainer" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10000; display: flex; flex-direction: column; gap: 10px; pointer-events: none;"></div>
+    <div
+      id="toastContainer"
+      style="
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        pointer-events: none;
+      "
+    ></div>
 
     <!-- Victory Popup -->
     <div class="victory-popup hidden" id="victoryPopup">
-        <div class="victory-overlay"></div>
-        <div class="victory-content">
-            
-            <div class="victory-body">
-                <div class="winner-icon" id="winnerIcon"></div>
-                <h2 class="winner-name" id="winnerName">Winner Name</h2>
-                <div class="winner-stats" id="winnerStats"></div>
-            </div>
+      <div class="victory-overlay"></div>
+      <div class="victory-content">
+        <div class="victory-body">
+          <div class="winner-icon" id="winnerIcon"></div>
+          <h2 class="winner-name" id="winnerName">Winner Name</h2>
+          <div class="winner-stats" id="winnerStats"></div>
         </div>
+      </div>
     </div>
 
     <!-- Top N Victory Popup -->
     <div class="victory-popup hidden" id="topNVictoryPopup">
-        <div class="victory-overlay"></div>
-        <div class="victory-content victory-content-topn">
-            <div class="victory-header">
-                <h1>🏆 TOP <span id="topNCount">N</span> WINNERS! 🏆</h1>
-            </div>
-            <div class="victory-body victory-body-topn" id="topNWinnersGrid">
-                <!-- Winners will be populated here -->
-            </div>
-            <div class="victory-footer victory-footer-topn" style="text-align:center;margin-top:18px;">
-                <button class="btn btn-primary" id="topNNextRaceBtn" style="font-size:1.3em;padding:10px 36px;border-radius:8px;display:inline-block;">Next Race</button>
-            </div>
+      <div class="victory-overlay"></div>
+      <div class="victory-content victory-content-topn">
+        <div class="victory-header">
+          <h1>🏆 TOP <span id="topNCount">N</span> WINNERS! 🏆</h1>
         </div>
-        <!-- Close button outside race-track area -->
-        <button class="btn btn-primary topn-close-btn" onclick="displayGame.closeTopNVictoryPopup()" style="display: none;">✓ Close</button>
+        <div class="victory-body victory-body-topn" id="topNWinnersGrid">
+          <!-- Winners will be populated here -->
         </div>
+        <div
+          class="victory-footer victory-footer-topn"
+          style="text-align: center; margin-top: 18px"
+        >
+          <button
+            class="btn btn-primary"
+            id="topNNextRaceBtn"
+            style="
+              font-size: 1.3em;
+              padding: 10px 36px;
+              border-radius: 8px;
+              display: inline-block;
+            "
+          >
+            Next Race
+          </button>
+        </div>
+      </div>
+      <!-- Close button outside race-track area -->
+      <button
+        class="btn btn-primary topn-close-btn"
+        onclick="displayGame.closeTopNVictoryPopup()"
+        style="display: none"
+      >
+        ✓ Close
+      </button>
     </div>
 
-    <script type="module" src="game.js?v=61"></script>
-    <script type="module">
-        // Import Game class
-        import { Game } from './game.js?v=61';
-        
-        // Display mode - sync with main window via BroadcastChannel
-        const displayChannel = new BroadcastChannel('race_display');
-        let displayGame = null;
-        
-        // Make displayGame globally accessible for inline event handlers
-        window.displayGame = displayGame;
+    <script src="game.js?v=66"></script>
+    <script>
+      // Display mode - sync with main window via BroadcastChannel
+      const displayChannel = new BroadcastChannel("race_display");
+      let displayGame = null;
 
-    // Đảm bảo nút Next Race sẽ tắt popup và reset trạng thái cho lần đua kế tiếp
-    document.addEventListener('DOMContentLoaded', function() {
-        var nextBtn = document.getElementById('topNNextRaceBtn');
+      // Đảm bảo nút Next Race sẽ tắt popup và reset trạng thái cho lần đua kế tiếp
+      document.addEventListener("DOMContentLoaded", function () {
+        var nextBtn = document.getElementById("topNNextRaceBtn");
         if (nextBtn) {
-            nextBtn.onclick = function() {
-                if (displayGame && displayGame.closeTopNVictoryPopup) {
-                    displayGame.closeTopNVictoryPopup();
-                }
-                // Reset trạng thái nếu có hàm resetRace hoặc tương tự
-                if (typeof handleResetRace === 'function') {
-                    handleResetRace();
-                }
-            };
+          nextBtn.onclick = function () {
+            if (displayGame && displayGame.closeTopNVictoryPopup) {
+              displayGame.closeTopNVictoryPopup();
+            }
+            // Reset trạng thái nếu có hàm resetRace hoặc tương tự
+            if (typeof handleResetRace === "function") {
+              handleResetRace();
+            }
+          };
         }
-    });
-        
-        window.addEventListener('load', async function() {
-            console.log('=== DISPLAY WINDOW LOAD EVENT ===');
-            console.log('Display mode initialized');
-            console.log('BroadcastChannel created');
-            
-            // Initialize butterfly cursor
-            initButterflyCursor();
-            
-            try {
-                // Import Game class dynamically
-                const { Game } = await import('./game.js?v=61');
-                
-                // Create game instance for display with isDisplayMode=true
-                console.log('Creating Game instance in display mode...');
-                displayGame = new Game(true); // Pass true for isDisplayMode
-                window.displayGame = displayGame; // Make globally accessible
-                console.log('✅ Game instance created, isDisplayMode:', displayGame.isDisplayMode);
-                
-                // Load icons immediately when display opens
-                console.log('Display mode: Loading icons immediately...');
-                
-                // Update loading display
-                const loadingEl = document.getElementById('loadingDisplay');
-                if (loadingEl) {
-                    loadingEl.innerHTML = `
+      });
+
+      window.addEventListener("load", function () {
+        console.log("=== DISPLAY WINDOW LOAD EVENT ===");
+        console.log("Display mode initialized");
+        console.log("BroadcastChannel created");
+
+        // Initialize butterfly cursor
+        initButterflyCursor();
+
+        try {
+          // Create game instance for display with isDisplayMode=true
+          console.log("Creating Game instance in display mode...");
+          displayGame = new Game(true); // Pass true for isDisplayMode
+          console.log(
+            "✅ Game instance created, isDisplayMode:",
+            displayGame.isDisplayMode,
+          );
+
+          // Load custom audio from localStorage if available
+          try {
+            const savedAudioData = localStorage.getItem("customAudioData");
+            const savedAudioFileName = localStorage.getItem(
+              "customAudioFileName",
+            );
+            if (savedAudioData && savedAudioFileName) {
+              console.log("🎵 Loading saved custom audio:", savedAudioFileName);
+              displayGame.soundManager.loadAudioFromBase64(
+                savedAudioData,
+                savedAudioFileName,
+              );
+            }
+          } catch (e) {
+            console.warn("⚠️ Could not load saved custom audio:", e);
+          }
+
+          // Load icons immediately when display opens
+          console.log("Display mode: Loading icons immediately...");
+
+          // Update loading display
+          const loadingEl = document.getElementById("loadingDisplay");
+          if (loadingEl) {
+            loadingEl.innerHTML = `
                         <h1 style="color: #FFD700; text-shadow: 0 0 20px #FFD700;">⏳ Loading Icons...</h1>
                         <p style="color: #fff; font-size: 24px; margin-top: 20px;">Race starting soon...</p>
                         <p style="color: #888; font-size: 16px; margin-top: 10px;">Loading animated ducks...</p>
                     `;
-                }
-                
-                // Icons will be loaded automatically by constructor
-                // Wait for them to finish loading with timeout
-                let checkCount = 0;
-                const maxChecks = 100; // 10 seconds max (100 * 100ms)
-                
-                const checkIconsLoaded = setInterval(() => {
-                    checkCount++;
-                    console.log(`Checking icons loaded... (${checkCount}/${maxChecks}) - imagesLoaded:`, displayGame.imagesLoaded);
-                    
-                    if (displayGame.imagesLoaded || checkCount >= maxChecks) {
-                        clearInterval(checkIconsLoaded);
-                        
-                        if (displayGame.imagesLoaded) {
-                            console.log('✅ Display icons loaded successfully, notifying control panel');
-                        } else {
-                            console.warn('⚠️ Timeout waiting for icons, proceeding anyway');
-                            // Force set to true to allow race to start
-                            displayGame.imagesLoaded = true;
-                        }
-                        
-                        // Update loading display
-                        if (loadingEl) {
-                            loadingEl.innerHTML = `
-                                <h1 style="color: #0f0; text-shadow: 0 0 20px #0f0;">✅ DISPLAY READY!</h1>
-                                <p style="color: #fff; font-size: 28px; margin-top: 20px; font-weight: bold;">
-                                    ${displayGame.iconCount} icons loaded
-                                </p>
-                                <p style="color: #fff; font-size: 20px; margin-top: 30px;">
-                                    Waiting for race to start...
-                                </p>
-                                <p style="color: #0f0; font-size: 18px; margin-top: 20px;">
-                                    👉 Go to control tab and click "Start Race"
-                                </p>
-                                <p style="color: #888; font-size: 14px; margin-top: 30px;">
-                                    💡 TIP: Press F11 for fullscreen
-                                </p>
+          }
+
+          // Icons will be loaded automatically by constructor
+          // Wait for them to finish loading with timeout
+          let checkCount = 0;
+          const maxChecks = 100; // 10 seconds max (100 * 100ms)
+
+          const checkIconsLoaded = setInterval(() => {
+            checkCount++;
+            console.log(
+              `Checking icons loaded... (${checkCount}/${maxChecks}) - imagesLoaded:`,
+              displayGame.imagesLoaded,
+            );
+
+            if (displayGame.imagesLoaded || checkCount >= maxChecks) {
+              clearInterval(checkIconsLoaded);
+
+              if (displayGame.imagesLoaded) {
+                console.log(
+                  "✅ Display icons loaded successfully, notifying control panel",
+                );
+              } else {
+                console.warn("⚠️ Timeout waiting for icons, proceeding anyway");
+                // Force set to true to allow race to start
+                displayGame.imagesLoaded = true;
+              }
+
+              // Update loading display
+              if (loadingEl) {
+                loadingEl.innerHTML = `
+                                <h1 style="color: #0f0; text-shadow: 0 0 20px #0f0; font-size: 48px; margin: 0;">✅ READY</h1>
                             `;
-                        }
-                        
-                        // Send message to control that icons are loaded with retry
-                        let retryCount = 0;
-                        let ackReceived = false;
-                        const maxRetries = 10;
-                        
-                        const sendIconsLoaded = () => {
-                            if (!ackReceived && retryCount < maxRetries) {
-                                displayChannel.postMessage({
-                                    type: 'DISPLAY_ICONS_LOADED',
-                                    data: {
-                                        iconCount: displayGame.iconCount,
-                                        imagesLoaded: displayGame.imagesLoaded
-                                    }
-                                });
-                                retryCount++;
-                                console.log(`📤 Sent DISPLAY_ICONS_LOADED (${displayGame.iconCount} icons) - attempt ${retryCount}/${maxRetries}`);
-                                
-                                if (retryCount < maxRetries) {
-                                    setTimeout(sendIconsLoaded, 500); // Retry every 500ms
-                                }
-                            }
-                        };
-                        
-                        // Listen for acknowledgment and other messages
-                        displayChannel.onmessage = (event) => {
-                            const { type } = event.data;
-                            
-                            if (type === 'CONTROL_ICONS_ACK') {
-                                ackReceived = true;
-                                console.log('✅ Control acknowledged icon load - stopping retry');
-                            }
-                            // Keep existing message handler
-                            handleDisplayMessage(event);
-                        };
-                        
-                        // Start sending
-                        sendIconsLoaded();
-                    }
+              }
 
+              // Send message to control that icons are loaded with retry
+              let retryCount = 0;
+              let ackReceived = false;
+              const maxRetries = 10;
 
+              const sendIconsLoaded = () => {
+                if (!ackReceived && retryCount < maxRetries) {
+                  displayChannel.postMessage({
+                    type: "DISPLAY_ICONS_LOADED",
+                    data: {
+                      iconCount: displayGame.iconCount,
+                      imagesLoaded: displayGame.imagesLoaded,
+                    },
+                  });
+                  retryCount++;
+                  console.log(
+                    `📤 Sent DISPLAY_ICONS_LOADED (${displayGame.iconCount} icons) - attempt ${retryCount}/${maxRetries}`,
+                  );
 
+                  if (retryCount < maxRetries) {
+                    setTimeout(sendIconsLoaded, 500); // Retry every 500ms
+                  }
+                }
+              };
 
+              // Listen for acknowledgment and other messages
+              displayChannel.onmessage = (event) => {
+                const { type } = event.data;
 
-                }, 100);
-            } catch (error) {
-                console.error('❌ ERROR creating Game instance:', error);
-                console.error('Error stack:', error.stack);
-                document.getElementById('loadingDisplay').innerHTML = `
+                if (type === "CONTROL_ICONS_ACK") {
+                  ackReceived = true;
+                  console.log(
+                    "✅ Control acknowledged icon load - stopping retry",
+                  );
+                }
+                // Keep existing message handler
+                handleDisplayMessage(event);
+              };
+
+              // Start sending
+              sendIconsLoaded();
+            }
+          }, 100);
+        } catch (error) {
+          console.error("❌ ERROR creating Game instance:", error);
+          console.error("Error stack:", error.stack);
+          document.getElementById("loadingDisplay").innerHTML = `
                     <h1 style="color: #f00;">❌ Error Loading Game</h1>
                     <p style="color: #fff;">${error.message}</p>
                     <p style="color: #888; font-size: 14px;">Check console for details</p>
                 `;
-                return;
-            }
-            
-            // Display is ready immediately - images will load on-demand when race starts
-            
-            // Handle all display messages
-            function handleDisplayMessage(event) {
-                console.log('📨 Display received message:', event.data);
-                const { type, data } = event.data;
-                
-                switch(type) {
-                                        case 'CLOSE_TOPN_POPUP':
-                                            if (displayGame && displayGame.closeTopNVictoryPopup) {
-                                                displayGame.closeTopNVictoryPopup();
-                                            }
-                                            break;
-                    case 'UPDATE_DUCK_SIZE':
-    if (displayGame) {
-        console.log('🦆 UPDATE_DUCK_SIZE received in display:', data);
-        displayGame.duckSizeRatio = data.duckSizeRatio;
-        // If you have a method to force redraw, call it here:
-        if (typeof displayGame.updateDuckPositionsCanvas === 'function') {
-            displayGame.updateDuckPositionsCanvas();
+          return;
         }
-    }
-    break;
-                    case 'START_RACE':
-                        console.log('🏁 START_RACE message received');
-                        handleStartRace(data);
-                        break;
-                    case 'RACE_UPDATE':
-                        handleRaceUpdate(data);
-                        break;
-                    case 'RACE_FINISHED':
-                        handleRaceFinished(data);
-                        break;
-                    case 'SHOW_WINNER':
-                        handleShowWinner(data);
-                        break;
-                    case 'SHOW_TOPN_WINNER':
-                        handleShowTopNWinner(data);
-                        break;
-                    case 'CLOSE_VICTORY':
-                        handleCloseVictory();
-                        break;
-                    case 'RESET_RACE':
-                        handleResetRace();
-                        break;
-                    case 'RESET_HISTORY':
-                        handleResetHistory();
-                        break;
-                    case 'SOUND_TOGGLE_CHANGED':
-                        console.log('🔊 Sound toggle changed:', data.enabled);
-                        if (displayGame && displayGame.soundManager) {
-                            displayGame.soundManager.setEnabled(data.enabled);
-                        }
-                        break;
-                    case 'CUSTOM_AUDIO_LOADED':
-                        console.log('🎵 Custom audio received:', data.fileName);
-                        if (displayGame && displayGame.soundManager) {
-                            displayGame.soundManager.loadAudioFromBase64(data.audioData, data.fileName);
-                        }
-                        break;
-                        break;
-                    case 'PAUSE_RACE':
-                        handlePauseRace();
-                        break;
-                    case 'RESUME_RACE':
-                        handleResumeRace(data);
-                        break;
-                    case 'SHOW_RESULTS':
-                        handleShowResults(data);
-                        break;
-                    case 'UPDATE_DISPLAY_SETTINGS':
-                        console.log('🎨 UPDATE_DISPLAY_SETTINGS received:', data);
-                        handleUpdateDisplaySettings(data);
-                        break;
-                    case 'UPDATE_RESULT_PANEL_SETTINGS':
-                        console.log('🎨 UPDATE_RESULT_PANEL_SETTINGS received:', data);
-                        handleUpdateResultPanelSettings(data);
-                        break;
-                    case 'FINISH_SAFE_ZONE_UPDATED':
-                        console.log('📏 FINISH_SAFE_ZONE_UPDATED received:', data);
-                        if (displayGame) {
-                            displayGame.finishSafeZone = data.finishSafeZone;
-                            // If displayGame has method to update lane management visuals, call it
-                            if (typeof displayGame.updateDuckPositionsCanvas === 'function') {
-                                displayGame.updateDuckPositionsCanvas();
-                            }
-                        }
-                        break;
-                    case 'FINISH_STAGGER_UPDATED':
-                        console.log('📐 FINISH_STAGGER_UPDATED received:', data);
-                        if (displayGame) {
-                            displayGame.finishStaggerEnabled = !!data.finishStaggerEnabled;
-                            if (typeof displayGame.finalizeFinishers === 'function') {
-                                // Re-run finalizer so display shows or hides offsets accordingly
-                                displayGame.finalizeFinishers();
-                            }
-                            if (typeof displayGame.updateDuckPositionsCanvas === 'function') {
-                                displayGame.updateDuckPositionsCanvas();
-                            }
-                        }
-                        break;
-                    case 'REQUEST_ICONS_STATUS':
-                        // Control is requesting icon status - reply immediately
-                        console.log('📨 Control requesting icon status, replying...');
-                        if (displayGame && displayGame.imagesLoaded && displayGame.iconCount > 0) {
-                            displayChannel.postMessage({
-                                type: 'DISPLAY_ICONS_LOADED',
-                                data: {
-                                    iconCount: displayGame.iconCount,
-                                    imagesLoaded: displayGame.imagesLoaded
-                                }
-                            });
-                            console.log('📤 Replied with DISPLAY_ICONS_LOADED -', displayGame.iconCount, 'icons');
-                        } else {
-                            console.log('⏳ Icons not ready yet, cannot reply. Loaded:', displayGame?.imagesLoaded, 'Count:', displayGame?.iconCount);
-                        }
-                        break;
-                    default:
-                        console.log('Unknown message type:', type);
+
+        // Display is ready immediately - images will load on-demand when race starts
+
+        // Handle all display messages
+        function handleDisplayMessage(event) {
+          console.log("📨 Display received message:", event.data);
+          const { type, data } = event.data;
+
+          switch (type) {
+            case "CLOSE_TOPN_POPUP":
+              if (displayGame && displayGame.closeTopNVictoryPopup) {
+                displayGame.closeTopNVictoryPopup();
+              }
+              break;
+            case "UPDATE_DUCK_SIZE":
+              if (displayGame) {
+                console.log("🦆 UPDATE_DUCK_SIZE received in display:", data);
+                displayGame.duckSizeRatio = data.duckSizeRatio;
+                // If you have a method to force redraw, call it here:
+                if (
+                  typeof displayGame.updateDuckPositionsCanvas === "function"
+                ) {
+                  displayGame.updateDuckPositionsCanvas();
                 }
-            }
-            
-            // Setup message listener BEFORE sending DISPLAY_READY
-            displayChannel.onmessage = handleDisplayMessage;
-            console.log('✅ Display message listener setup complete');
-            
-            // Send ready message
-            displayChannel.postMessage({ 
-                type: 'DISPLAY_READY'
-            });
-            console.log('📤 Sent DISPLAY_READY message');
+              }
+              break;
+            case "START_RACE":
+              console.log("🏁 START_RACE message received");
+              handleStartRace(data);
+              break;
+            case "RACE_UPDATE":
+              handleRaceUpdate(data);
+              break;
+            case "RACE_FINISHED":
+              handleRaceFinished(data);
+              break;
+            case "SHOW_WINNER":
+              handleShowWinner(data);
+              break;
+            case "SHOW_TOPN_WINNER":
+              handleShowTopNWinner(data);
+              break;
+            case "CLOSE_VICTORY":
+              handleCloseVictory();
+              break;
+            case "RESET_RACE":
+              handleResetRace();
+              break;
+            case "SOUND_TOGGLE_CHANGED":
+              console.log("🔊 Sound toggle changed:", data.enabled);
+              if (displayGame && displayGame.soundManager) {
+                displayGame.soundManager.setEnabled(data.enabled);
+              }
+              break;
+            case "CUSTOM_AUDIO_LOADED":
+              console.log("🎵 Custom audio received:", data.fileName);
+              if (displayGame && displayGame.soundManager) {
+                displayGame.soundManager.loadAudioFromBase64(
+                  data.audioData,
+                  data.fileName,
+                );
+                // Save to localStorage for persistence
+                localStorage.setItem("customAudioData", data.audioData);
+                localStorage.setItem("customAudioFileName", data.fileName);
+              }
+              break;
+            case "CLEAR_CUSTOM_AUDIO":
+              console.log("🗑️ Clear custom audio received");
+              if (displayGame && displayGame.soundManager) {
+                displayGame.soundManager.clearCustomAudio();
+                // Clear from localStorage
+                localStorage.removeItem("customAudioData");
+                localStorage.removeItem("customAudioFileName");
+              }
+              break;
+            case "PAUSE_RACE":
+              handlePauseRace();
+              break;
+            case "RESUME_RACE":
+              handleResumeRace(data);
+              break;
+            case "SHOW_RESULTS":
+              handleShowResults(data);
+              break;
+            case "UPDATE_DISPLAY_SETTINGS":
+              console.log("🎨 UPDATE_DISPLAY_SETTINGS received:", data);
+              handleUpdateDisplaySettings(data);
+              break;
+            case "UPDATE_RESULT_PANEL_SETTINGS":
+              console.log("🎨 UPDATE_RESULT_PANEL_SETTINGS received:", data);
+              handleUpdateResultPanelSettings(data);
+              break;
+            case "FINISH_SAFE_ZONE_UPDATED":
+              console.log("📏 FINISH_SAFE_ZONE_UPDATED received:", data);
+              if (displayGame) {
+                displayGame.finishSafeZone = data.finishSafeZone;
+                // If displayGame has method to update lane management visuals, call it
+                if (
+                  typeof displayGame.updateDuckPositionsCanvas === "function"
+                ) {
+                  displayGame.updateDuckPositionsCanvas();
+                }
+              }
+              break;
+            case "FINISH_STAGGER_UPDATED":
+              console.log("📐 FINISH_STAGGER_UPDATED received:", data);
+              if (displayGame) {
+                displayGame.finishStaggerEnabled = !!data.finishStaggerEnabled;
+                if (typeof displayGame.finalizeFinishers === "function") {
+                  // Re-run finalizer so display shows or hides offsets accordingly
+                  displayGame.finalizeFinishers();
+                }
+                if (
+                  typeof displayGame.updateDuckPositionsCanvas === "function"
+                ) {
+                  displayGame.updateDuckPositionsCanvas();
+                }
+              }
+              break;
+            case "REQUEST_ICONS_STATUS":
+              // Control is requesting icon status - reply immediately
+              console.log("📨 Control requesting icon status, replying...");
+              if (
+                displayGame &&
+                displayGame.imagesLoaded &&
+                displayGame.iconCount > 0
+              ) {
+                displayChannel.postMessage({
+                  type: "DISPLAY_ICONS_LOADED",
+                  data: {
+                    iconCount: displayGame.iconCount,
+                    imagesLoaded: displayGame.imagesLoaded,
+                  },
+                });
+                console.log(
+                  "📤 Replied with DISPLAY_ICONS_LOADED -",
+                  displayGame.iconCount,
+                  "icons",
+                );
+              } else {
+                console.log(
+                  "⏳ Icons not ready yet, cannot reply. Loaded:",
+                  displayGame?.imagesLoaded,
+                  "Count:",
+                  displayGame?.iconCount,
+                );
+              }
+              break;
+            default:
+              console.log("Unknown message type:", type);
+          }
+        }
+
+        // Setup message listener BEFORE sending DISPLAY_READY
+        displayChannel.onmessage = handleDisplayMessage;
+        console.log("✅ Display message listener setup complete");
+
+        // Send ready message
+        displayChannel.postMessage({
+          type: "DISPLAY_READY",
         });
-        function handleStartRace(data) {
-            console.log('🏁 Display: START_RACE received', data);
-            
-            try {
-                // Icons should already be loaded since display loads them on open
-                console.log('Display: Icons already loaded, starting race immediately');
-                startRaceWithData(data);
-            } catch (error) {
-                console.error('❌ Display: Error in handleStartRace:', error);
-                console.error('Error stack:', error.stack);
-                // Show error on screen
-                const loadingEl = document.getElementById('loadingDisplay');
-                if (loadingEl) {
-                    loadingEl.style.display = 'block';
-                    loadingEl.innerHTML = `
+        console.log("📤 Sent DISPLAY_READY message");
+      });
+      function handleStartRace(data) {
+        console.log("🏁 Display: START_RACE received", data);
+
+        try {
+          // Icons should already be loaded since display loads them on open
+          console.log(
+            "Display: Icons already loaded, starting race immediately",
+          );
+          startRaceWithData(data);
+        } catch (error) {
+          console.error("❌ Display: Error in handleStartRace:", error);
+          console.error("Error stack:", error.stack);
+          // Show error on screen
+          const loadingEl = document.getElementById("loadingDisplay");
+          if (loadingEl) {
+            loadingEl.style.display = "block";
+            loadingEl.innerHTML = `
                         <h1 style="color: #f00;">❌ Error Starting Race</h1>
                         <p style="color: #fff;">${error.message}</p>
                         <p style="color: #888; font-size: 14px;">Check console for details</p>
                     `;
-                }
-            }
+          }
         }
-        
-        function startRaceWithData(data) {
-            const { duckCount, raceDuration, raceMode, winnerCount, gameSpeed, theme, duckNames, duckCodes, duckImages, startTime, usedPrizesCount, prizeRaceList } = data;
-            
-            console.log('🎮 Display: startRaceWithData called with:', { duckCount, raceDuration, raceMode, winnerCount, gameSpeed, theme, duckNamesCount: duckNames?.length, duckCodesCount: duckCodes?.length, usedPrizesCount, prizeRaceListCount: prizeRaceList?.length });
-            
-            // Verify displayGame exists
-            if (!displayGame) {
-                console.error('❌ displayGame is null! Cannot start race.');
-                return;
-            }
-            
-            console.log('✅ displayGame exists:', displayGame);
-            console.log('   - imagesLoaded:', displayGame.imagesLoaded);
-            console.log('   - iconCount:', displayGame.iconCount);
-            console.log('   - isDisplayMode:', displayGame.isDisplayMode);
-            
-            // Close victory popup if still open from previous race
-            if (displayGame) {
-                displayGame.closeVictoryPopup && displayGame.closeVictoryPopup();
-                displayGame.closeTopNVictoryPopup && displayGame.closeTopNVictoryPopup();
-                
-                // Hide result panel from previous race
-                const resultPanel = document.getElementById('resultPanel');
-                if (resultPanel) {
-                    resultPanel.classList.add('hidden');
-                    resultPanel.style.display = 'none';
-                    console.log('Display: Result panel hidden');
-                }
-                
-                // CRITICAL: Reset timing variables to prevent timer continuation
-                displayGame.startTime = null;
-                displayGame.lastFrameTime = null;
-                
-                console.log('Display: Reset timing variables and closed all popups for new race');
-            }
-            
-            // CRITICAL: Hide loading display with style.display instead of class
-            const loadingEl = document.getElementById('loadingDisplay');
-            if (loadingEl) {
-                console.log('Display: Hiding loading screen');
-                loadingEl.style.display = 'none';
-            } else {
-                console.error('Display: loadingDisplay element not found!');
-            }
-            
-            // Show race elements (only big timer and race track on display)
-            const bigTimer = document.getElementById('bigTimer');
-            if (bigTimer) {
-                // Reset timer to 00:00:00
-                const timerDisplay = bigTimer.querySelector('.timer-display');
-                if (timerDisplay) timerDisplay.textContent = '00:00:00';
-                bigTimer.classList.remove('hidden');
-                console.log('Display: Big timer shown');
-            }
-            
-            // Ensure race track is visible
-            const raceTrack = document.getElementById('raceTrack');
-            if (raceTrack) {
-                raceTrack.classList.remove('hidden');
-                raceTrack.style.display = 'block';
-                console.log('Display: Race track shown');
-            } else {
-                console.error('Display: raceTrack element not found!');
-            }
-            
-            // Initialize race
-            displayGame.duckCount = duckCount;
-            displayGame.raceDuration = raceDuration;
-            displayGame.raceMode = raceMode || 'normal'; // Set race mode from control
-            displayGame.winnerCount = winnerCount || 1; // Set winner count from control
-            displayGame.gameSpeed = gameSpeed || 1.0; // Set game speed from control
-            displayGame.winners = []; // Reset winners array
-            displayGame.currentTheme = theme;
-            
-            // CRITICAL: Force sync prize data from control (0 is a valid value!)
-            displayGame.usedPrizesCount = usedPrizesCount || 0;
-            displayGame.prizeRaceList = prizeRaceList || [];
-            
-            console.log('🎁 Display synced prize data - usedPrizesCount:', displayGame.usedPrizesCount, 'prizeList:', displayGame.prizeRaceList.slice(0, 5));
-            
-            if (duckNames && duckNames.length > 0) {
-                displayGame.activeDuckNames = duckNames;
-                displayGame.duckNames = duckNames; // Also set duckNames for reference
-            }
-            if (duckCodes && duckCodes.length > 0) {
-                displayGame.activeDuckCodes = duckCodes;
-                displayGame.duckCodes = duckCodes; // Also set duckCodes for reference
-            }
-            
-            console.log('Display: Setting up race - Mode:', displayGame.raceMode, 'WinnerCount:', displayGame.winnerCount, 'Speed:', displayGame.gameSpeed + 'x', 'Ducks:', duckCount, 'UsedPrizes:', displayGame.usedPrizesCount);
-            try {
-                displayGame.setupRace();
-                console.log('✅ Display: setupRace() completed successfully');
-            } catch (error) {
-                console.error('❌ Display: Error in setupRace():', error);
-                throw error;
-            }
-            
-            console.log('Display: Beginning race');
-            try {
-                displayGame.beginRace();
-                console.log('✅ Display: beginRace() completed successfully');
-            } catch (error) {
-                console.error('❌ Display: Error in beginRace():', error);
-                throw error;
-            }
-        }
-        
-        function handleRaceUpdate(data) {
-            // Display mode doesn't need to update race info - only timer updates via animate()
-            // All race info is shown on index.html control panel
-            console.log('Race update received:', data);
-        }
-        
-        function handleRaceFinished(data) {
-            console.log('Race finished on display - finalizing visuals');
-            if (displayGame) {
-                // Mark race finished state so logic can render final visuals
-                displayGame.raceStarted = false;
-                displayGame.raceFinished = true;
+      }
 
-                // Ensure ducks that passed finish line are marked finished (safety)
-                try {
-                    const FINISH_LINE_OFFSET = typeof FINISH_LINE_OFFSET !== 'undefined' ? FINISH_LINE_OFFSET : 75;
-                    displayGame.ducks.forEach(d => {
-                        if (d.position >= displayGame.trackLength - FINISH_LINE_OFFSET) d.finished = true;
-                    });
-                    // If the RACE_FINISHED message included winners, mark them explicitly too
-                    const winners = data && (data.winners || (data.winner ? [data.winner] : null));
-                    if (winners && winners.length > 0) {
-                        winners.forEach(w => {
-                            // Match by id or name if provided
-                            const duckObj = displayGame.ducks.find(dd => dd.id === w.id || dd.name === w.name || dd.name === w);
-                            if (duckObj) duckObj.finished = true;
-                        });
-                    }
-                } catch (e) {
-                    console.warn('Error marking finishers:', e);
-                }
+      function startRaceWithData(data) {
+        const {
+          duckCount,
+          raceDuration,
+          raceMode,
+          winnerCount,
+          gameSpeed,
+          theme,
+          duckNames,
+          duckCodes,
+          duckImages,
+          startTime,
+          currentScriptPrizeName,
+        } = data;
 
-                // Force a final DOM update so name transitions (duck-name) happen immediately
-                try {
-                    if (typeof displayGame.finalizeFinishers === 'function') displayGame.finalizeFinishers();
-                    if (typeof displayGame.redistributeDucks === 'function') displayGame.redistributeDucks();
-                    if (typeof displayGame.updateDuckPositions === 'function') displayGame.updateDuckPositions();
-                } catch (e) {
-                    console.warn('Error during final update:', e);
-                }
-
-                // Give small time for CSS transitions to run, then stop animation and sounds
-                setTimeout(() => {
-                    if (displayGame.animationId) {
-                        cancelAnimationFrame(displayGame.animationId);
-                        displayGame.animationId = null;
-                    }
-                    // Stop all sounds
-                    if (displayGame.soundManager) displayGame.soundManager.stopRacingAmbiance();
-                    console.log('✅ Display animation stopped after finalizing visuals');
-                }, 350); // ~1 frame + transition start time
-            }
-        }
-        
-        function handleShowWinner(data) {
-            const { winner, finishTime } = data;
-            if (displayGame && winner) {
-                // Don't show popup if in Top N mode
-                if (displayGame.raceMode === 'topN') {
-                    console.log('Display: Top N mode - skipping victory popup');
-                    return;
-                }
-                
-                // If finishTime provided, set it on winner object for display
-                if (finishTime !== undefined) {
-                    winner._displayFinishTime = finishTime;
-                    console.log('Display: Using synchronized finishTime:', finishTime);
-                }
-                displayGame.showVictoryPopup(winner);
-            }
-        }
-        
-        function handleShowTopNWinner(data) {
-            const { winners, finishTime } = data;
-            if (displayGame && winners) {
-                console.log('Display: Showing Top N victory popup with', winners.length, 'winners');
-                
-                // Set winners on displayGame
-                displayGame.currentRaceWinners = winners;
-                
-                // Show Top N popup
-                displayGame.showTopNVictoryPopup();
-            }
-        }
-        
-        function handleCloseVictory() {
-            console.log('Closing victory popup on display');
-            if (displayGame) {
-                displayGame.closeVictoryPopup();
-                displayGame.closeTopNVictoryPopup();
-            }
-        }
-        
-        function handleResetRace() {
-            console.log('Resetting race on display');
-            if (displayGame) {
-                // Stop animation if still running
-                if (displayGame.animationId) {
-                    cancelAnimationFrame(displayGame.animationId);
-                    displayGame.animationId = null;
-                }
-                
-                // Clear all race state
-                displayGame.ducks = [];
-                displayGame.duckElements.clear();
-                displayGame.raceStarted = false;
-                displayGame.raceFinished = false;
-                displayGame.racePaused = false;
-                displayGame.rankings = [];
-                displayGame.startTime = null;
-                displayGame.lastFrameTime = null;
-                
-                // Stop sounds
-                displayGame.soundManager.stopRacingAmbiance();
-                
-                // Clear track container
-                if (displayGame.trackContainer) {
-                    displayGame.trackContainer.innerHTML = '';
-                }
-                
-                // DON'T show loading screen - just hide race elements
-                // Loading screen will cause flashing issue
-                // Race track will be shown again when START_RACE is received
-                
-                // Hide timer and finish line
-                const bigTimer = document.getElementById('bigTimer');
-                const finishLine = document.getElementById('finishLine');
-                const victoryPopup = document.getElementById('victoryPopup');
-                
-                if (bigTimer) bigTimer.classList.add('hidden');
-                if (finishLine) finishLine.classList.add('hidden');
-                if (victoryPopup) victoryPopup.classList.add('hidden');
-                
-                console.log('✅ Display reset complete, ready for next race');
-            }
-        }
-        
-        function handleResetHistory() {
-            console.log('🗑️ RESET_HISTORY: Clearing all history on display');
-            if (displayGame) {
-                // Reset prize tracking counters
-                displayGame.usedPrizesCount = 0;
-                displayGame.winners = [];
-                displayGame.prizeResultAssignments = [];
-                
-                // Clear ALL localStorage keys
-                localStorage.setItem('usedPrizesCount', '0');
-                localStorage.removeItem('prizeResultAssignments');
-                localStorage.removeItem('duckRaceWinners');
-                localStorage.removeItem('prizeRaceList');
-                
-                // Close all popups
-                if (displayGame.closeVictoryPopup) displayGame.closeVictoryPopup();
-                if (displayGame.closeTopNVictoryPopup) displayGame.closeTopNVictoryPopup();
-                
-                // Hide result panel
-                const resultPanel = document.getElementById('resultPanel');
-                if (resultPanel) {
-                    resultPanel.classList.add('hidden');
-                    resultPanel.style.display = 'none';
-                }
-                
-                console.log('✅ History cleared - usedPrizesCount reset to:', displayGame.usedPrizesCount);
-                console.log('✅ localStorage cleared');
-            }
-        }
-        
-        function handlePauseRace() {
-            console.log('Pausing race on display');
-            if (displayGame) {
-                displayGame.pauseRace();
-            }
-        }
-        
-        function handleResumeRace(data) {
-            console.log('Resuming race on display');
-            if (displayGame) {
-                displayGame.resumeRace();
-            }
-        }
-
-        function handleShowResults(data) {
-            console.log('📊 Display: SHOW_RESULTS received', data);
-            
-            if (!data || !displayGame) {
-                console.warn('No data or displayGame not ready');
-                return;
-            }
-
-            // Hide loading screen
-            const loadingEl = document.getElementById('loadingDisplay');
-            if (loadingEl) {
-                loadingEl.style.display = 'none';
-            }
-
-            // Hide race track
-            const raceTrack = document.getElementById('raceTrack');
-            if (raceTrack) {
-                raceTrack.style.display = 'none';
-            }
-
-            // Hide victory popup
-            const victoryPopup = document.getElementById('victoryPopup');
-            if (victoryPopup) {
-                victoryPopup.classList.add('hidden');
-            }
-
-            // Update displayGame data
-            if (data.winners) {
-                displayGame.winners = data.winners;
-            }
-            if (data.totalRaces !== undefined) {
-                displayGame.stats.totalRaces = data.totalRaces;
-            }
-
-            // Update result panel UI using displayGame method
-            displayGame.showWinnersPanel();
-            
-            // Get result panel and make fullscreen
-            const resultPanel = document.getElementById('resultPanel');
-            if (resultPanel) {
-                resultPanel.classList.remove('hidden');
-                resultPanel.classList.add('fullscreen');
-                
-                // Hide all buttons on display
-                const buttons = resultPanel.querySelectorAll('button');
-                buttons.forEach(btn => {
-                    btn.style.display = 'none';
-                });
-                
-                console.log('✅ Results displayed in fullscreen');
-            }
-        }
-        
-        function handleUpdateDisplaySettings(data) {
-            console.log('🎨 Applying display settings:', data);
-            
-            const raceTrack = document.getElementById('raceTrack');
-            if (!raceTrack) {
-                console.error('Race track element not found');
-                return;
-            }
-            
-            // Apply background settings based on type
-            if (data.type === 'default') {
-                // Reset to default
-                raceTrack.style.background = '';
-                raceTrack.style.backgroundImage = '';
-                raceTrack.style.backgroundColor = '';
-                console.log('✓ Background reset to default');
-            } else if (data.type === 'color') {
-                // Apply solid color
-                raceTrack.style.backgroundImage = 'none';
-                raceTrack.style.backgroundColor = data.color || '#1a1a2e';
-                console.log('✓ Background color applied:', data.color);
-            } else if (data.type === 'image' && data.image) {
-                // Apply custom image
-                raceTrack.style.backgroundColor = '';
-                raceTrack.style.backgroundImage = `url('${data.image}')`;
-                raceTrack.style.backgroundSize = 'cover';
-                raceTrack.style.backgroundPosition = 'center';
-                raceTrack.style.backgroundRepeat = 'no-repeat';
-                console.log('✓ Background image applied');
-            }
-        }
-        
-        function handleUpdateResultPanelSettings(data) {
-            console.log('🎨 Applying result panel settings on display:', data);
-            
-            const resultPanel = document.getElementById('resultPanel');
-            if (!resultPanel) {
-                console.error('Result panel element not found on display');
-                return;
-            }
-            
-            // Apply background settings with !important to override CSS
-            if (data.type === 'default') {
-                // Reset to default
-                resultPanel.style.removeProperty('background');
-                resultPanel.style.removeProperty('background-image');
-                resultPanel.style.removeProperty('background-size');
-                resultPanel.style.removeProperty('background-position');
-                resultPanel.style.removeProperty('background-repeat');
-                resultPanel.classList.remove('custom-background');
-                console.log('✓ Result panel background reset to default');
-            } else {
-                // Add class to hide pseudo-elements
-                resultPanel.classList.add('custom-background');
-                
-                if (data.type === 'color') {
-                    resultPanel.style.setProperty('background', data.color, 'important');
-                    resultPanel.style.removeProperty('background-image');
-                    console.log('✓ Result panel color applied:', data.color);
-                } else if (data.type === 'image' && data.image) {
-                    resultPanel.style.setProperty('background-image', `url(${data.image})`, 'important');
-                    resultPanel.style.setProperty('background-size', 'cover', 'important');
-                    resultPanel.style.setProperty('background-position', 'center', 'important');
-                    resultPanel.style.setProperty('background-repeat', 'no-repeat', 'important');
-                    resultPanel.style.setProperty('background-color', 'transparent', 'important');
-                    console.log('✓ Result panel image applied');
-                }
-            }
-            
-            // Apply prize title
-            if (data.prizeTitle) {
-                const resultTitle = document.querySelector('.result-title');
-                if (resultTitle) {
-                    resultTitle.textContent = data.prizeTitle;
-                    console.log('✓ Prize title updated:', data.prizeTitle);
-                }
-                // Save to localStorage for next load
-                localStorage.setItem('customPrizeTitle', data.prizeTitle);
-            }
-            
-            // Apply prize names
-            if (data.prizeNames) {
-                // Save to localStorage for next load
-                localStorage.setItem('customPrizeNames', JSON.stringify(data.prizeNames));
-                console.log('✓ Prize names saved:', data.prizeNames);
-            }
-            
-            // Apply layout settings
-            if (data.winnersGridWidth || data.cardGap) {
-                const winnersGridWidth = data.winnersGridWidth || '95';
-                const cardGap = data.cardGap || '1.5';
-                
-                // Save to localStorage
-                localStorage.setItem('winnersGridWidth', winnersGridWidth);
-                localStorage.setItem('cardGap', cardGap);
-                
-                // Apply to winners-grid if it exists
-                const winnersGrid = document.querySelector('.winners-grid');
-                if (winnersGrid) {
-                    winnersGrid.style.width = winnersGridWidth + '%';
-                    winnersGrid.style.gap = cardGap + '%';
-                    console.log('✓ Layout settings applied:', { winnersGridWidth, cardGap });
-                }
-            }
-            
-            // Apply race track aspect ratio
-            if (data.raceTrackWidth && data.raceTrackHeight) {
-                const raceTrackWidth = data.raceTrackWidth || '20';
-                const raceTrackHeight = data.raceTrackHeight || '5';
-                
-                // Save to localStorage
-                localStorage.setItem('raceTrackWidth', raceTrackWidth);
-                localStorage.setItem('raceTrackHeight', raceTrackHeight);
-                
-                // Apply aspect ratio to display
-                if (displayGame && typeof displayGame.applyRaceTrackAspectRatio === 'function') {
-                    displayGame.applyRaceTrackAspectRatio(raceTrackWidth, raceTrackHeight);
-                    console.log('✓ Race track aspect ratio applied:', `${raceTrackWidth}:${raceTrackHeight}`);
-                }
-            }
-        }
-        
-        // Load saved settings on page load
-        window.addEventListener('load', () => {
-            // Load display background settings
-            const savedType = localStorage.getItem('displayBackgroundType');
-            if (savedType && savedType !== 'default') {
-                const savedColor = localStorage.getItem('displayBackgroundColor');
-                const savedImage = localStorage.getItem('displayBackgroundImage');
-                
-                handleUpdateDisplaySettings({
-                    type: savedType,
-                    color: savedColor,
-                    image: savedImage
-                });
-                
-                console.log('✓ Loaded saved display settings from localStorage');
-            }
-            
-            // Load result panel background settings
-            const resultPanelType = localStorage.getItem('resultPanelBackgroundType');
-            if (resultPanelType && resultPanelType !== 'default') {
-                const resultPanelColor = localStorage.getItem('resultPanelBackgroundColor');
-                const resultPanelImage = localStorage.getItem('resultPanelBackgroundImage');
-                
-                handleUpdateResultPanelSettings({
-                    type: resultPanelType,
-                    color: resultPanelColor,
-                    image: resultPanelImage
-                });
-                
-                console.log('✓ Loaded saved result panel settings from localStorage');
-            }
-            
-            // Load race track aspect ratio settings
-            const savedTrackWidth = localStorage.getItem('raceTrackWidth');
-            const savedTrackHeight = localStorage.getItem('raceTrackHeight');
-            if (savedTrackWidth && savedTrackHeight && displayGame) {
-                displayGame.applyRaceTrackAspectRatio(savedTrackWidth, savedTrackHeight);
-                console.log('✓ Loaded saved race track aspect ratio:', `${savedTrackWidth}:${savedTrackHeight}`);
-            }
+        console.log("🎮 Display: startRaceWithData called with:", {
+          duckCount,
+          raceDuration,
+          raceMode,
+          winnerCount,
+          gameSpeed,
+          theme,
+          duckNamesCount: duckNames?.length,
+          duckCodesCount: duckCodes?.length,
         });
 
-        // Butterfly cursor animation with smooth movement
-        function initButterflyCursor() {
-            const cursor = document.getElementById('butterflyCursor');
-            if (!cursor) return;
-
-            let mouseX = window.innerWidth / 2;
-            let mouseY = window.innerHeight / 2;
-            let cursorX = mouseX;
-            let cursorY = mouseY;
-            let lastTrailTime = 0;
-
-            // Track mouse position
-            document.addEventListener('mousemove', (e) => {
-                mouseX = e.clientX;
-                mouseY = e.clientY;
-
-                // Create trail effect every 100ms
-                const now = Date.now();
-                if (now - lastTrailTime > 100) {
-                    createTrail(mouseX, mouseY);
-                    lastTrailTime = now;
-                }
-            });
-
-            // Smooth cursor movement with easing (soft-start, soft-stop)
-            function animateCursor() {
-                // Easing factor (0.1 = slower, smoother; 0.5 = faster)
-                const easing = 0.15;
-                
-                // Calculate distance
-                const dx = mouseX - cursorX;
-                const dy = mouseY - cursorY;
-                
-                // Apply easing (soft-start, soft-stop effect)
-                cursorX += dx * easing;
-                cursorY += dy * easing;
-
-                // Update cursor position
-                cursor.style.left = cursorX + 'px';
-                cursor.style.top = cursorY + 'px';
-
-                // Add rotation based on movement direction
-                const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-                cursor.style.transform = `translate(-50%, -50%) rotate(${angle + 90}deg)`;
-
-                requestAnimationFrame(animateCursor);
-            }
-
-            // Create sparkle trail
-            function createTrail(x, y) {
-                const trail = document.createElement('div');
-                trail.className = 'butterfly-trail';
-                trail.style.left = x + 'px';
-                trail.style.top = y + 'px';
-                document.body.appendChild(trail);
-
-                // Fade in
-                setTimeout(() => trail.style.opacity = '1', 10);
-
-                // Remove after animation
-                setTimeout(() => trail.remove(), 1000);
-            }
-
-            // Start animation
-            animateCursor();
+        // Verify displayGame exists
+        if (!displayGame) {
+          console.error("❌ displayGame is null! Cannot start race.");
+          return;
         }
+
+        console.log("✅ displayGame exists:", displayGame);
+        console.log("   - imagesLoaded:", displayGame.imagesLoaded);
+        console.log("   - iconCount:", displayGame.iconCount);
+        console.log("   - isDisplayMode:", displayGame.isDisplayMode);
+
+        // Close victory popup if still open from previous race
+        if (displayGame) {
+          displayGame.closeVictoryPopup();
+
+          // CRITICAL: Reset timing variables to prevent timer continuation
+          displayGame.startTime = null;
+          displayGame.lastFrameTime = null;
+
+          console.log("Display: Reset timing variables for new race");
+        }
+
+        // CRITICAL: Hide loading display with style.display instead of class
+        const loadingEl = document.getElementById("loadingDisplay");
+        if (loadingEl) {
+          console.log("Display: Hiding loading screen");
+          loadingEl.style.display = "none";
+        } else {
+          console.error("Display: loadingDisplay element not found!");
+        }
+
+        // Show race elements (only big timer and race track on display)
+        const bigTimer = document.getElementById("bigTimer");
+        if (bigTimer) {
+          // Reset timer to 00:00:00
+          const timerDisplay = bigTimer.querySelector(".timer-display");
+          if (timerDisplay) timerDisplay.textContent = "00:00:00";
+          bigTimer.classList.remove("hidden");
+          console.log("Display: Big timer shown");
+        }
+
+        // Ensure race track is visible
+        const raceTrack = document.getElementById("raceTrack");
+        if (raceTrack) {
+          raceTrack.classList.remove("hidden");
+          raceTrack.style.display = "block";
+          console.log("Display: Race track shown");
+        } else {
+          console.error("Display: raceTrack element not found!");
+        }
+
+        // Initialize race
+        displayGame.duckCount = duckCount;
+        displayGame.raceDuration = raceDuration;
+        displayGame.raceMode = raceMode || "normal"; // Set race mode from control
+        displayGame.winnerCount = winnerCount || 1; // Set winner count from control
+        displayGame.gameSpeed = gameSpeed || 1.0; // Set game speed from control
+        displayGame.winners = []; // Reset winners array
+        displayGame.currentTheme = theme;
+        displayGame.currentScriptPrizeName = currentScriptPrizeName; // Set prize name from script
+        if (duckNames && duckNames.length > 0) {
+          displayGame.activeDuckNames = duckNames;
+          displayGame.duckNames = duckNames; // Also set duckNames for reference
+        }
+        if (duckCodes && duckCodes.length > 0) {
+          displayGame.activeDuckCodes = duckCodes;
+          displayGame.duckCodes = duckCodes; // Also set duckCodes for reference
+        }
+
+        console.log(
+          "Display: Setting up race - Mode:",
+          displayGame.raceMode,
+          "WinnerCount:",
+          displayGame.winnerCount,
+          "Speed:",
+          displayGame.gameSpeed + "x",
+          "Ducks:",
+          duckCount,
+        );
+        try {
+          displayGame.setupRace();
+          console.log("✅ Display: setupRace() completed successfully");
+        } catch (error) {
+          console.error("❌ Display: Error in setupRace():", error);
+          throw error;
+        }
+
+        console.log("Display: Beginning race");
+        try {
+          displayGame.beginRace();
+          console.log("✅ Display: beginRace() completed successfully");
+        } catch (error) {
+          console.error("❌ Display: Error in beginRace():", error);
+          throw error;
+        }
+      }
+
+      function handleRaceUpdate(data) {
+        // Display mode doesn't need to update race info - only timer updates via animate()
+        // All race info is shown on index.html control panel
+        console.log("Race update received:", data);
+      }
+
+      function handleRaceFinished(data) {
+        console.log("Race finished on display - finalizing visuals");
+        if (displayGame) {
+          // Mark race finished state so logic can render final visuals
+          displayGame.raceStarted = false;
+          displayGame.raceFinished = true;
+
+          // Ensure ducks that passed finish line are marked finished (safety)
+          try {
+            const FINISH_LINE_OFFSET = 75;
+            displayGame.ducks.forEach((d) => {
+              if (d.position >= displayGame.trackLength - FINISH_LINE_OFFSET)
+                d.finished = true;
+            });
+            // If the RACE_FINISHED message included winners, mark them explicitly too
+            const winners =
+              data && (data.winners || (data.winner ? [data.winner] : null));
+            if (winners && winners.length > 0) {
+              winners.forEach((w) => {
+                // Match by id or name if provided
+                const duckObj = displayGame.ducks.find(
+                  (dd) => dd.id === w.id || dd.name === w.name || dd.name === w,
+                );
+                if (duckObj) duckObj.finished = true;
+              });
+            }
+          } catch (e) {
+            console.warn("Error marking finishers:", e);
+          }
+
+          // Force a final DOM update so name transitions (duck-name) happen immediately
+          try {
+            if (typeof displayGame.finalizeFinishers === "function")
+              displayGame.finalizeFinishers();
+            if (typeof displayGame.redistributeDucks === "function")
+              displayGame.redistributeDucks();
+            if (typeof displayGame.updateDuckPositions === "function")
+              displayGame.updateDuckPositions();
+          } catch (e) {
+            console.warn("Error during final update:", e);
+          }
+
+          // Give small time for CSS transitions to run, then stop animation and sounds
+          setTimeout(() => {
+            if (displayGame.animationId) {
+              cancelAnimationFrame(displayGame.animationId);
+              displayGame.animationId = null;
+            }
+            // Stop all sounds
+            if (displayGame.soundManager)
+              displayGame.soundManager.stopRacingAmbiance();
+            console.log(
+              "✅ Display animation stopped after finalizing visuals",
+            );
+          }, 350); // ~1 frame + transition start time
+        }
+      }
+
+      function handleShowWinner(data) {
+        const { winner, finishTime } = data;
+        if (displayGame && winner) {
+          // Don't show popup if in Top N mode
+          if (displayGame.raceMode === "topN") {
+            console.log("Display: Top N mode - skipping victory popup");
+            return;
+          }
+
+          // If finishTime provided, set it on winner object for display
+          if (finishTime !== undefined) {
+            winner._displayFinishTime = finishTime;
+            console.log("Display: Using synchronized finishTime:", finishTime);
+          }
+          displayGame.showVictoryPopup(winner);
+        }
+      }
+
+      function handleShowTopNWinner(data) {
+        const { winners, finishTime } = data;
+        if (displayGame && winners) {
+          console.log(
+            "Display: Showing Top N victory popup with",
+            winners.length,
+            "winners",
+          );
+          console.log(
+            "Display received winners:",
+            JSON.stringify(
+              winners.map((w) => ({ name: w.name, prizeName: w.prizeName })),
+            ),
+          );
+
+          // Set winners on displayGame
+          displayGame.currentRaceWinners = winners;
+
+          // Show Top N popup
+          displayGame.showTopNVictoryPopup();
+        }
+      }
+
+      function handleCloseVictory() {
+        console.log("Closing victory popup on display");
+        if (displayGame) {
+          displayGame.closeVictoryPopup();
+          displayGame.closeTopNVictoryPopup();
+        }
+      }
+
+      function handleResetRace() {
+        console.log("Resetting race on display");
+        if (displayGame) {
+          // Stop animation if still running
+          if (displayGame.animationId) {
+            cancelAnimationFrame(displayGame.animationId);
+            displayGame.animationId = null;
+          }
+
+          // Clear all race state
+          displayGame.ducks = [];
+          displayGame.duckElements.clear();
+          displayGame.raceStarted = false;
+          displayGame.raceFinished = false;
+          displayGame.racePaused = false;
+          displayGame.rankings = [];
+          displayGame.startTime = null;
+          displayGame.lastFrameTime = null;
+
+          // Stop sounds
+          displayGame.soundManager.stopRacingAmbiance();
+
+          // Clear track container
+          if (displayGame.trackContainer) {
+            displayGame.trackContainer.innerHTML = "";
+          }
+
+          // DON'T show loading screen - just hide race elements
+          // Loading screen will cause flashing issue
+          // Race track will be shown again when START_RACE is received
+
+          // Hide timer and finish line
+          const bigTimer = document.getElementById("bigTimer");
+          const finishLine = document.getElementById("finishLine");
+          const victoryPopup = document.getElementById("victoryPopup");
+
+          if (bigTimer) bigTimer.classList.add("hidden");
+          if (finishLine) finishLine.classList.add("hidden");
+          if (victoryPopup) victoryPopup.classList.add("hidden");
+
+          console.log("✅ Display reset complete, ready for next race");
+        }
+      }
+
+      function handlePauseRace() {
+        console.log("Pausing race on display");
+        if (displayGame) {
+          displayGame.pauseRace();
+        }
+      }
+
+      function handleResumeRace(data) {
+        console.log("Resuming race on display");
+        if (displayGame) {
+          displayGame.resumeRace();
+        }
+      }
+
+      function handleShowResults(data) {
+        console.log("📊 Display: SHOW_RESULTS received", data);
+
+        if (!data || !displayGame) {
+          console.warn("No data or displayGame not ready");
+          return;
+        }
+
+        // Hide loading screen
+        const loadingEl = document.getElementById("loadingDisplay");
+        if (loadingEl) {
+          loadingEl.style.display = "none";
+        }
+
+        // Hide race track
+        const raceTrack = document.getElementById("raceTrack");
+        if (raceTrack) {
+          raceTrack.style.display = "none";
+        }
+
+        // Hide victory popup
+        const victoryPopup = document.getElementById("victoryPopup");
+        if (victoryPopup) {
+          victoryPopup.classList.add("hidden");
+        }
+
+        // Update displayGame data
+        if (data.winners) {
+          displayGame.winners = data.winners;
+        }
+        if (data.totalRaces !== undefined) {
+          displayGame.stats.totalRaces = data.totalRaces;
+        }
+        // Update prize title if provided
+        if (data.prizeTitle) {
+          displayGame.currentScriptPrizeName = data.prizeTitle;
+        }
+
+        // Update result panel UI using displayGame method
+        displayGame.showWinnersPanel();
+
+        // Get result panel and make fullscreen
+        const resultPanel = document.getElementById("resultPanel");
+        if (resultPanel) {
+          resultPanel.classList.remove("hidden");
+          resultPanel.classList.add("fullscreen");
+
+          // Hide all buttons on display
+          const buttons = resultPanel.querySelectorAll("button");
+          buttons.forEach((btn) => {
+            btn.style.display = "none";
+          });
+
+          console.log("✅ Results displayed in fullscreen");
+        }
+      }
+
+      function handleUpdateDisplaySettings(data) {
+        console.log("🎨 Applying display settings:", data);
+
+        const raceTrack = document.getElementById("raceTrack");
+        if (!raceTrack) {
+          console.error("Race track element not found");
+          return;
+        }
+
+        // Apply background settings based on type
+        if (data.type === "default") {
+          // Reset to default
+          raceTrack.style.background = "";
+          raceTrack.style.backgroundImage = "";
+          raceTrack.style.backgroundColor = "";
+          console.log("✓ Background reset to default");
+        } else if (data.type === "color") {
+          // Apply solid color
+          raceTrack.style.backgroundImage = "none";
+          raceTrack.style.backgroundColor = data.color || "#1a1a2e";
+          console.log("✓ Background color applied:", data.color);
+        } else if (data.type === "image" && data.image) {
+          // Apply custom image
+          raceTrack.style.backgroundColor = "";
+          raceTrack.style.backgroundImage = `url('${data.image}')`;
+          raceTrack.style.backgroundSize = "cover";
+          raceTrack.style.backgroundPosition = "center";
+          raceTrack.style.backgroundRepeat = "no-repeat";
+          console.log("✓ Background image applied");
+        }
+      }
+
+      function handleUpdateResultPanelSettings(data) {
+        console.log("🎨 Applying result panel settings on display:", data);
+
+        const resultPanel = document.getElementById("resultPanel");
+        if (!resultPanel) {
+          console.error("Result panel element not found on display");
+          return;
+        }
+
+        // Apply background settings with !important to override CSS
+        if (data.type === "default") {
+          // Reset to default
+          resultPanel.style.removeProperty("background");
+          resultPanel.style.removeProperty("background-image");
+          resultPanel.style.removeProperty("background-size");
+          resultPanel.style.removeProperty("background-position");
+          resultPanel.style.removeProperty("background-repeat");
+          resultPanel.classList.remove("custom-background");
+          console.log("✓ Result panel background reset to default");
+        } else {
+          // Add class to hide pseudo-elements
+          resultPanel.classList.add("custom-background");
+
+          if (data.type === "color") {
+            resultPanel.style.setProperty(
+              "background",
+              data.color,
+              "important",
+            );
+            resultPanel.style.removeProperty("background-image");
+            console.log("✓ Result panel color applied:", data.color);
+          } else if (data.type === "image" && data.image) {
+            resultPanel.style.setProperty(
+              "background-image",
+              `url(${data.image})`,
+              "important",
+            );
+            resultPanel.style.setProperty(
+              "background-size",
+              "cover",
+              "important",
+            );
+            resultPanel.style.setProperty(
+              "background-position",
+              "center",
+              "important",
+            );
+            resultPanel.style.setProperty(
+              "background-repeat",
+              "no-repeat",
+              "important",
+            );
+            resultPanel.style.setProperty(
+              "background-color",
+              "transparent",
+              "important",
+            );
+            console.log("✓ Result panel image applied");
+          }
+        }
+
+        // Apply prize title
+        if (data.prizeTitle) {
+          const resultTitle = document.querySelector(".result-title");
+          if (resultTitle) {
+            resultTitle.textContent = data.prizeTitle;
+            console.log("✓ Prize title updated:", data.prizeTitle);
+          }
+          // Save to localStorage for next load
+          localStorage.setItem("customPrizeTitle", data.prizeTitle);
+        }
+
+        // Apply prize names
+        if (data.prizeNames) {
+          // Save to localStorage for next load
+          localStorage.setItem(
+            "customPrizeNames",
+            JSON.stringify(data.prizeNames),
+          );
+          console.log("✓ Prize names saved:", data.prizeNames);
+        }
+
+        // Apply layout settings
+        if (data.winnersGridWidth || data.cardGap) {
+          const winnersGridWidth = data.winnersGridWidth || "95";
+          const cardGap = data.cardGap || "1.5";
+
+          // Save to localStorage
+          localStorage.setItem("winnersGridWidth", winnersGridWidth);
+          localStorage.setItem("cardGap", cardGap);
+
+          // Apply to winners-grid if it exists
+          const winnersGrid = document.querySelector(".winners-grid");
+          if (winnersGrid) {
+            winnersGrid.style.width = winnersGridWidth + "%";
+            winnersGrid.style.gap = cardGap + "%";
+            console.log("✓ Layout settings applied:", {
+              winnersGridWidth,
+              cardGap,
+            });
+          }
+        }
+
+        // Apply race track aspect ratio
+        if (data.raceTrackWidth && data.raceTrackHeight) {
+          const raceTrackWidth = data.raceTrackWidth || "20";
+          const raceTrackHeight = data.raceTrackHeight || "5";
+
+          // Save to localStorage
+          localStorage.setItem("raceTrackWidth", raceTrackWidth);
+          localStorage.setItem("raceTrackHeight", raceTrackHeight);
+
+          // Apply aspect ratio to display
+          if (
+            displayGame &&
+            typeof displayGame.applyRaceTrackAspectRatio === "function"
+          ) {
+            displayGame.applyRaceTrackAspectRatio(
+              raceTrackWidth,
+              raceTrackHeight,
+            );
+            console.log(
+              "✓ Race track aspect ratio applied:",
+              `${raceTrackWidth}:${raceTrackHeight}`,
+            );
+          }
+        }
+      }
+
+      // Load saved settings on page load
+      window.addEventListener("load", () => {
+        // Load display background settings
+        const savedType = localStorage.getItem("displayBackgroundType");
+        if (savedType && savedType !== "default") {
+          const savedColor = localStorage.getItem("displayBackgroundColor");
+          const savedImage = localStorage.getItem("displayBackgroundImage");
+
+          handleUpdateDisplaySettings({
+            type: savedType,
+            color: savedColor,
+            image: savedImage,
+          });
+
+          console.log("✓ Loaded saved display settings from localStorage");
+        }
+
+        // Load result panel background settings
+        const resultPanelType = localStorage.getItem(
+          "resultPanelBackgroundType",
+        );
+        if (resultPanelType && resultPanelType !== "default") {
+          const resultPanelColor = localStorage.getItem(
+            "resultPanelBackgroundColor",
+          );
+          const resultPanelImage = localStorage.getItem(
+            "resultPanelBackgroundImage",
+          );
+
+          handleUpdateResultPanelSettings({
+            type: resultPanelType,
+            color: resultPanelColor,
+            image: resultPanelImage,
+          });
+
+          console.log("✓ Loaded saved result panel settings from localStorage");
+        }
+
+        // Load race track aspect ratio settings
+        const savedTrackWidth = localStorage.getItem("raceTrackWidth");
+        const savedTrackHeight = localStorage.getItem("raceTrackHeight");
+        if (savedTrackWidth && savedTrackHeight && displayGame) {
+          displayGame.applyRaceTrackAspectRatio(
+            savedTrackWidth,
+            savedTrackHeight,
+          );
+          console.log(
+            "✓ Loaded saved race track aspect ratio:",
+            `${savedTrackWidth}:${savedTrackHeight}`,
+          );
+        }
+      });
+
+      // Butterfly cursor animation with smooth movement
+      function initButterflyCursor() {
+        const cursor = document.getElementById("butterflyCursor");
+        if (!cursor) return;
+
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+        let cursorX = mouseX;
+        let cursorY = mouseY;
+        let lastTrailTime = 0;
+
+        // Track mouse position
+        document.addEventListener("mousemove", (e) => {
+          mouseX = e.clientX;
+          mouseY = e.clientY;
+
+          // Create trail effect every 100ms
+          const now = Date.now();
+          if (now - lastTrailTime > 100) {
+            createTrail(mouseX, mouseY);
+            lastTrailTime = now;
+          }
+        });
+
+        // Smooth cursor movement with easing (soft-start, soft-stop)
+        function animateCursor() {
+          // Easing factor (0.1 = slower, smoother; 0.5 = faster)
+          const easing = 0.15;
+
+          // Calculate distance
+          const dx = mouseX - cursorX;
+          const dy = mouseY - cursorY;
+
+          // Apply easing (soft-start, soft-stop effect)
+          cursorX += dx * easing;
+          cursorY += dy * easing;
+
+          // Update cursor position
+          cursor.style.left = cursorX + "px";
+          cursor.style.top = cursorY + "px";
+
+          // Add rotation based on movement direction
+          const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+          cursor.style.transform = `translate(-50%, -50%) rotate(${angle + 90}deg)`;
+
+          requestAnimationFrame(animateCursor);
+        }
+
+        // Create sparkle trail
+        function createTrail(x, y) {
+          const trail = document.createElement("div");
+          trail.className = "butterfly-trail";
+          trail.style.left = x + "px";
+          trail.style.top = y + "px";
+          document.body.appendChild(trail);
+
+          // Fade in
+          setTimeout(() => (trail.style.opacity = "1"), 10);
+
+          // Remove after animation
+          setTimeout(() => trail.remove(), 1000);
+        }
+
+        // Start animation
+        animateCursor();
+      }
     </script>
-</body>
+  </body>
 </html>
