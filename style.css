@@ -1052,43 +1052,13 @@ h1 {
   left: 0;
   width: 100%;
   height: 70%;
-  /* Sử dụng hai lớp nền để flip ngang mỗi lần lặp */
   /* Ensure river appears above bank-top but beneath ducks */
   z-index: 50;
-  pointer-events: none;
-  background-image: url("static/race.png"), url("static/race.png");
-  background-repeat: repeat-x, repeat-x;
-  background-size:
-    auto 100%,
-    auto 100%;
-  background-position:
-    0 0,
-    100% 0;
-  /* Lớp thứ hai sẽ được flip bằng pseudo-element */
-  position: absolute;
-  top: 15%;
-  left: 0;
-  width: 100%;
-  height: 70%;
-  overflow: hidden;
-}
-
-/* Flip lớp nền thứ hai bằng pseudo-element */
-.race-river::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
   pointer-events: none;
   background-image: url("static/race.png");
   background-repeat: repeat-x;
   background-size: auto 100%;
   background-position: 0 0;
-  transform: scaleX(-1);
-  z-index: 1;
-  opacity: 0.5; /* Có thể chỉnh lại nếu cần */
   overflow: hidden;
 }
 

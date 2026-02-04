@@ -923,8 +923,9 @@ class Game {
     this.winnerAnimationFrame = 0;
     this.winnerAnimationInterval = null;
 
-    this.duckImages = []; // Mỗi phần tử sẽ là array 3 ảnh [frame1, frame2, frame3]
-    this.iconCount = 44; // output_3 có 44 folders
+    this.duckImages = []; // Mỗi phần tử sẽ là array chứa các frame của 1 duck
+    this.iconCount = 0; // Sẽ được detect tự động
+    this.folderFileMapping = {}; // Map folder -> list of files
     this.imagesLoaded = false;
     this.displayIconsLoaded = false; // Track if display has loaded icons
     this.currentTheme = "output_3"; // Sử dụng output_3
@@ -3107,9 +3108,11 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     }
   }
 
-  detectAndLoadDuckImages() {
-    // Tự động detect số folder có sẵn trong theme
-    console.log(`Starting icon detection for theme: ${this.currentTheme}`);
+  async detectAndLoadDuckImages() {
+    // Tự động detect tất cả folder và file có sẵn trong theme
+    console.log(
+      `Starting dynamic icon detection for theme: ${this.currentTheme}`,
+    );
 
     const iconCountEl = document.getElementById("iconCount");
     if (iconCountEl) {
@@ -3121,159 +3124,291 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       this.showLoading("Detecting icons...", 0);
     }
 
-    const maxFolders = 50; // Kiểm tra tối đa 50 folders
-    let detectedCount = 0;
-    let consecutiveFails = 0;
-    const maxFails = 3;
+    try {
+      // Bước 1: Detect tất cả thư mục con
+      const folders = await this.detectAllFolders();
 
-    const checkFolder = (folderNum) => {
-      const testImg = new Image();
-      const testPath = `${this.currentTheme}/${folderNum}/compressed_final_${folderNum}_1.webp`;
-      testImg.src = testPath;
+      if (folders.length === 0) {
+        console.error("No folders found in:", this.currentTheme);
+        if (document.getElementById("loadingContainer")) {
+          this.hideLoading();
+        }
+        if (!this.isDisplayMode) {
+          alert("No icon folders found! Please check the icon theme.");
+        }
+        return;
+      }
 
-      testImg.onload = () => {
-        console.log(`✓ Found folder ${folderNum}`);
-        detectedCount++;
-        consecutiveFails = 0;
+      console.log(`✅ Found ${folders.length} folders:`, folders);
 
-        const progress = Math.round((detectedCount / maxFolders) * 50); // 50% cho detection
+      // Bước 2: Detect tất cả file trong mỗi thư mục
+      this.folderFileMapping = {}; // {folderName: [file1, file2, ...]}
+
+      for (let i = 0; i < folders.length; i++) {
+        const folder = folders[i];
+        const files = await this.detectAllFilesInFolder(folder);
+
+        if (files.length > 0) {
+          this.folderFileMapping[folder] = files;
+          console.log(`✓ Folder ${folder}: ${files.length} files detected`);
+        }
+
+        const progress = Math.round(((i + 1) / folders.length) * 30); // 0-30% cho detection
         this.updateLoadingProgress(
-          `Detecting icons... (${detectedCount} found)`,
+          `Detecting files... ${i + 1}/${folders.length} folders`,
           progress,
         );
+      }
 
-        if (folderNum < maxFolders) {
-          checkFolder(folderNum + 1);
-        } else {
-          this.iconCount = detectedCount;
-          console.log(`Detection complete: ${detectedCount} folders found`);
-          document.getElementById("iconCount").textContent =
-            `${detectedCount} icons detected`;
-          this.loadAllDuckImages();
-        }
-      };
+      this.iconCount = folders.length;
+      const iconCountEl = document.getElementById("iconCount");
+      if (iconCountEl) {
+        iconCountEl.textContent = `${folders.length} icons detected`;
+      }
 
-      testImg.onerror = () => {
-        console.log(`✗ Folder ${folderNum} not found (path: ${testPath})`);
-        consecutiveFails++;
-        if (consecutiveFails < maxFails && folderNum < maxFolders) {
-          checkFolder(folderNum + 1);
-        } else {
-          // Kết thúc detection
-          this.iconCount = detectedCount;
-          console.log(
-            `Detection stopped at folder ${folderNum}. Total found: ${detectedCount}`,
-          );
-
-          const iconCountEl = document.getElementById("iconCount");
-          if (iconCountEl) {
-            iconCountEl.textContent = `${detectedCount} icons detected`;
-          }
-
-          if (detectedCount > 0) {
-            this.loadAllDuckImages();
-          } else {
-            console.error(
-              "No icons found! Check if files exist in:",
-              this.currentTheme,
-            );
-            if (document.getElementById("loadingContainer")) {
-              this.hideLoading();
-            }
-            if (!this.isDisplayMode) {
-              alert("No icons found! Please check the icon theme.");
-            }
-          }
-        }
-      };
-    };
-
-    checkFolder(1);
+      // Bước 3: Load tất cả các file
+      await this.loadAllDuckImages();
+    } catch (error) {
+      console.error("Error during icon detection:", error);
+      if (document.getElementById("loadingContainer")) {
+        this.hideLoading();
+      }
+      if (!this.isDisplayMode) {
+        alert("Error loading icons: " + error.message);
+      }
+    }
   }
 
-  loadAllDuckImages() {
-    if (this.iconCount === 0) {
+  async detectAllFolders() {
+    // Detect thư mục từ 1-100, sắp xếp theo số
+    const folders = [];
+    const maxCheck = 100; // Check tối đa 100 thư mục
+    let consecutiveFails = 0;
+    const maxFails = 5; // Dừng sau 5 lần fail liên tiếp
+
+    for (let i = 1; i <= maxCheck; i++) {
+      const folderName = String(i);
+      const hasFiles = await this.checkFolderExists(folderName);
+
+      if (hasFiles) {
+        folders.push(folderName);
+        consecutiveFails = 0;
+      } else {
+        consecutiveFails++;
+        if (consecutiveFails >= maxFails) {
+          console.log(
+            `Stopped checking at folder ${i} after ${maxFails} consecutive fails`,
+          );
+          break;
+        }
+      }
+    }
+
+    // Sắp xếp theo số
+    folders.sort((a, b) => parseInt(a) - parseInt(b));
+    return folders;
+  }
+
+  async checkFolderExists(folderName) {
+    // Thử một vài file đầu tiên để check folder tồn tại
+    const extensions = ["png", "webp"];
+    const numbersToCheck = [17, 23, 1, 2, 10];
+
+    for (const num of numbersToCheck) {
+      for (const ext of extensions) {
+        // Chỉ thử 2 pattern phổ biến nhất
+        const files = [
+          `compressed_frame_${String(num).padStart(4, "0")}.${ext}`,
+          `compressed_final_${folderName}_${num}.${ext}`,
+        ];
+
+        for (const fileName of files) {
+          const exists = await new Promise((resolve) => {
+            const testImg = new Image();
+            testImg.src = `${this.currentTheme}/${folderName}/${fileName}`;
+            const timeout = setTimeout(() => resolve(false), 50);
+
+            testImg.onload = () => {
+              clearTimeout(timeout);
+              resolve(true);
+            };
+            testImg.onerror = () => {
+              clearTimeout(timeout);
+              resolve(false);
+            };
+          });
+
+          if (exists) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  async detectAllFilesInFolder(folderName) {
+    // Đơn giản: thử load file từ 0-100, chỉ với 2 pattern chính
+    const files = [];
+    const maxNum = 100;
+    const extensions = ["png", "webp"];
+
+    // Load tuần tự để giảm request không cần thiết
+    for (let num = 0; num <= maxNum; num++) {
+      let foundAny = false;
+
+      for (const ext of extensions) {
+        // Chỉ thử 2 pattern phổ biến: compressed_frame_XXXX và compressed_final_X_Y
+        const patterns = [
+          `compressed_frame_${String(num).padStart(4, "0")}.${ext}`,
+          `compressed_final_${folderName}_${num}.${ext}`,
+        ];
+
+        for (const fileName of patterns) {
+          const exists = await this.checkFileExists(folderName, fileName);
+          if (exists) {
+            files.push(fileName);
+            foundAny = true;
+            break; // Tìm thấy 1 là đủ, không thử pattern khác
+          }
+        }
+
+        if (foundAny) break; // Tìm thấy rồi thì không thử extension khác
+      }
+
+      // Dừng sớm nếu không tìm thấy file nào trong 10 số liên tiếp
+      if (!foundAny && files.length > 0 && num > 50) {
+        // Đã có file và đang ở số >50 mà không tìm thấy → có thể đã hết
+        let emptyCount = 1;
+        // Thử thêm 9 số nữa
+        for (let checkNum = num + 1; checkNum <= num + 9; checkNum++) {
+          let checkFound = false;
+          for (const ext of extensions) {
+            const patterns = [
+              `compressed_frame_${String(checkNum).padStart(4, "0")}.${ext}`,
+              `compressed_final_${folderName}_${checkNum}.${ext}`,
+            ];
+            for (const fileName of patterns) {
+              const exists = await this.checkFileExists(folderName, fileName);
+              if (exists) {
+                checkFound = true;
+                break;
+              }
+            }
+            if (checkFound) break;
+          }
+          if (!checkFound) emptyCount++;
+        }
+        // Nếu 10 số liên tiếp đều không có file → dừng
+        if (emptyCount >= 10) {
+          console.log(
+            `Folder ${folderName}: Stopped at ${num}, found ${files.length} files`,
+          );
+          break;
+        }
+      }
+    }
+
+    // Sắp xếp file theo tên
+    files.sort();
+    return files;
+  }
+
+  async checkFileExists(folderName, fileName) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = `${this.currentTheme}/${folderName}/${fileName}`;
+
+      const timeout = setTimeout(() => resolve(false), 100); // 100ms timeout
+
+      img.onload = () => {
+        clearTimeout(timeout);
+        resolve(true);
+      };
+
+      img.onerror = () => {
+        clearTimeout(timeout);
+        resolve(false);
+      };
+    });
+  }
+
+  async loadAllDuckImages() {
+    if (this.iconCount === 0 || !this.folderFileMapping) {
       console.warn("No icons detected!");
       this.hideLoading();
       return;
     }
 
-    // Load 3 frames từ mỗi folder
+    // Load tất cả file từ folderFileMapping
+    const folders = Object.keys(this.folderFileMapping).sort(
+      (a, b) => parseInt(a) - parseInt(b),
+    );
+    const totalFolders = folders.length;
     let loadedFolders = 0;
-    const totalFolders = this.iconCount;
+    let totalFiles = 0;
 
-    this.updateLoadingProgress(`Loading ${totalFolders} animated icons...`, 50);
+    // Đếm tổng số file
+    folders.forEach((folder) => {
+      totalFiles += this.folderFileMapping[folder].length;
+    });
 
-    for (let folderNum = 1; folderNum <= totalFolders; folderNum++) {
+    console.log(
+      `Loading ${totalFolders} folders with ${totalFiles} total files...`,
+    );
+    this.updateLoadingProgress(`Loading ${totalFolders} animated icons...`, 30);
+
+    // Reset duckImages
+    this.duckImages = [];
+
+    // Load từng folder
+    for (const folderName of folders) {
+      const files = this.folderFileMapping[folderName];
       const frames = [];
-      let loadedFrames = 0;
 
-      // Load 3 frames cho mỗi folder
-      for (let frameNum = 1; frameNum <= 3; frameNum++) {
-        const img = new Image();
-        img.src = `${this.currentTheme}/${folderNum}/compressed_final_${folderNum}_${frameNum}.webp`;
+      // Load tất cả file trong folder này
+      const loadPromises = files.map((fileName) => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.src = `${this.currentTheme}/${folderName}/${fileName}`;
 
-        img.onload = () => {
-          loadedFrames++;
-          if (loadedFrames === 3) {
-            loadedFolders++;
-            const progress =
-              50 + Math.round((loadedFolders / totalFolders) * 50); // 50-100%
-            this.updateLoadingProgress(
-              `Loading icons: ${loadedFolders}/${totalFolders}`,
-              progress,
-            );
+          img.onload = () => {
+            frames.push(img);
+            resolve(true);
+          };
 
-            if (loadedFolders === totalFolders) {
-              this.imagesLoaded = true;
-              console.log(
-                `Loaded ${totalFolders} duck animations (3 frames each) from ${this.currentTheme}!`,
-              );
-              const iconCountEl = document.getElementById("iconCount");
-              if (iconCountEl) {
-                iconCountEl.textContent = `${totalFolders} icon (animated)`;
-              }
-              this.hideLoading();
-              this.enableStartButton();
-            }
-          }
-        };
+          img.onerror = () => {
+            console.warn(`Failed to load: ${img.src}`);
+            resolve(false);
+          };
+        });
+      });
 
-        img.onerror = () => {
-          console.warn(`Failed to load: ${img.src}`);
-          loadedFrames++;
-          if (loadedFrames === 3) {
-            loadedFolders++;
-            const progress =
-              50 + Math.round((loadedFolders / totalFolders) * 50);
-            this.updateLoadingProgress(
-              `Loading icons: ${loadedFolders}/${totalFolders}`,
-              progress,
-            );
+      await Promise.all(loadPromises);
 
-            if (loadedFolders === totalFolders) {
-              this.imagesLoaded = true;
-              const iconCountEl = document.getElementById("iconCount");
-              if (iconCountEl) {
-                iconCountEl.textContent = `${totalFolders} icon (animated)`;
-              }
-              this.hideLoading();
-              this.enableStartButton();
-            }
-          }
-        };
-
-        frames.push(img);
-      }
-
+      // Lưu frames cho folder này (ngay cả khi có file bị lỗi)
       this.duckImages.push(frames);
+
+      loadedFolders++;
+      const progress = 30 + Math.round((loadedFolders / totalFolders) * 70); // 30-100%
+      this.updateLoadingProgress(
+        `Loading icons: ${loadedFolders}/${totalFolders}`,
+        progress,
+      );
     }
 
-    // Cập nhật UI ngay lập tức
+    this.imagesLoaded = true;
+    console.log(
+      `✅ Loaded ${totalFolders} duck animations (${totalFiles} total frames) from ${this.currentTheme}!`,
+    );
+
     const iconCountEl = document.getElementById("iconCount");
     if (iconCountEl) {
-      iconCountEl.textContent = `Loading ${totalFolders} animated ducks...`;
+      iconCountEl.textContent = `${totalFolders} icons (${totalFiles} frames)`;
     }
+
+    this.hideLoading();
+    this.enableStartButton();
   }
 
   preloadDuckImages() {
