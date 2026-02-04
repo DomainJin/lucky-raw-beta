@@ -3180,137 +3180,79 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
   }
 
   async detectAllFolders() {
-    // Detect thư mục từ 1-100, sắp xếp theo số
+    // output_3 có 7 folders từ 1 đến 7
     const folders = [];
-    const maxCheck = 100; // Check tối đa 100 thư mục
-    let consecutiveFails = 0;
-    const maxFails = 5; // Dừng sau 5 lần fail liên tiếp
+    const totalFolders = 7;
 
-    for (let i = 1; i <= maxCheck; i++) {
+    for (let i = 1; i <= totalFolders; i++) {
       const folderName = String(i);
       const hasFiles = await this.checkFolderExists(folderName);
 
       if (hasFiles) {
         folders.push(folderName);
-        consecutiveFails = 0;
-      } else {
-        consecutiveFails++;
-        if (consecutiveFails >= maxFails) {
-          console.log(
-            `Stopped checking at folder ${i} after ${maxFails} consecutive fails`,
-          );
-          break;
-        }
       }
     }
 
-    // Sắp xếp theo số
-    folders.sort((a, b) => parseInt(a) - parseInt(b));
+    console.log(`Detected ${folders.length} folders:`, folders);
     return folders;
   }
 
   async checkFolderExists(folderName) {
-    // Thử một vài file đầu tiên để check folder tồn tại
-    const extensions = ["png", "webp"];
-    const numbersToCheck = [17, 23, 1, 2, 10];
+    // Chỉ cần check file compressed_frame_1.png hoặc .webp
+    const extensions = ["webp", "png"];
 
-    for (const num of numbersToCheck) {
-      for (const ext of extensions) {
-        // Chỉ thử 2 pattern phổ biến nhất
-        const files = [
-          `compressed_frame_${String(num).padStart(4, "0")}.${ext}`,
-          `compressed_final_${folderName}_${num}.${ext}`,
-        ];
+    for (const ext of extensions) {
+      const fileName = `compressed_frame_1.${ext}`;
+      const exists = await new Promise((resolve) => {
+        const testImg = new Image();
+        testImg.src = `${this.currentTheme}/${folderName}/${fileName}`;
+        const timeout = setTimeout(() => resolve(false), 100);
 
-        for (const fileName of files) {
-          const exists = await new Promise((resolve) => {
-            const testImg = new Image();
-            testImg.src = `${this.currentTheme}/${folderName}/${fileName}`;
-            const timeout = setTimeout(() => resolve(false), 50);
+        testImg.onload = () => {
+          clearTimeout(timeout);
+          resolve(true);
+        };
+        testImg.onerror = () => {
+          clearTimeout(timeout);
+          resolve(false);
+        };
+      });
 
-            testImg.onload = () => {
-              clearTimeout(timeout);
-              resolve(true);
-            };
-            testImg.onerror = () => {
-              clearTimeout(timeout);
-              resolve(false);
-            };
-          });
-
-          if (exists) {
-            return true;
-          }
-        }
+      if (exists) {
+        return true;
       }
     }
     return false;
   }
 
   async detectAllFilesInFolder(folderName) {
-    // Đơn giản: thử load file từ 0-100, chỉ với 2 pattern chính
+    // Mỗi folder có 5 file: compressed_frame_1.png đến compressed_frame_5.png
     const files = [];
-    const maxNum = 100;
-    const extensions = ["png", "webp"];
+    const totalFrames = 5;
+    const extensions = ["webp", "png"];
 
-    // Load tuần tự để giảm request không cần thiết
-    for (let num = 0; num <= maxNum; num++) {
-      let foundAny = false;
+    for (let num = 1; num <= totalFrames; num++) {
+      let foundFile = null;
 
+      // Thử webp trước (ưu tiên), sau đó thử png
       for (const ext of extensions) {
-        // Chỉ thử 2 pattern phổ biến: compressed_frame_XXXX và compressed_final_X_Y
-        const patterns = [
-          `compressed_frame_${String(num).padStart(4, "0")}.${ext}`,
-          `compressed_final_${folderName}_${num}.${ext}`,
-        ];
+        const fileName = `compressed_frame_${num}.${ext}`;
+        const exists = await this.checkFileExists(folderName, fileName);
 
-        for (const fileName of patterns) {
-          const exists = await this.checkFileExists(folderName, fileName);
-          if (exists) {
-            files.push(fileName);
-            foundAny = true;
-            break; // Tìm thấy 1 là đủ, không thử pattern khác
-          }
-        }
-
-        if (foundAny) break; // Tìm thấy rồi thì không thử extension khác
-      }
-
-      // Dừng sớm nếu không tìm thấy file nào trong 10 số liên tiếp
-      if (!foundAny && files.length > 0 && num > 50) {
-        // Đã có file và đang ở số >50 mà không tìm thấy → có thể đã hết
-        let emptyCount = 1;
-        // Thử thêm 9 số nữa
-        for (let checkNum = num + 1; checkNum <= num + 9; checkNum++) {
-          let checkFound = false;
-          for (const ext of extensions) {
-            const patterns = [
-              `compressed_frame_${String(checkNum).padStart(4, "0")}.${ext}`,
-              `compressed_final_${folderName}_${checkNum}.${ext}`,
-            ];
-            for (const fileName of patterns) {
-              const exists = await this.checkFileExists(folderName, fileName);
-              if (exists) {
-                checkFound = true;
-                break;
-              }
-            }
-            if (checkFound) break;
-          }
-          if (!checkFound) emptyCount++;
-        }
-        // Nếu 10 số liên tiếp đều không có file → dừng
-        if (emptyCount >= 10) {
-          console.log(
-            `Folder ${folderName}: Stopped at ${num}, found ${files.length} files`,
-          );
+        if (exists) {
+          foundFile = fileName;
           break;
         }
       }
+
+      if (foundFile) {
+        files.push(foundFile);
+      } else {
+        console.warn(`Missing frame ${num} in folder ${folderName}`);
+      }
     }
 
-    // Sắp xếp file theo tên
-    files.sort();
+    console.log(`Folder ${folderName}: Found ${files.length}/5 frames`);
     return files;
   }
 
