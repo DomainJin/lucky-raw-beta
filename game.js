@@ -3554,12 +3554,12 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     if (fileName && this.duckNames.length > 0) {
       if (fileLabel)
         fileLabel.innerHTML = `Racer List File <span style="color: #4CAF50;">(✓ Loaded: ${fileName})</span>:`;
-      if (clearBtn) clearBtn.style.display = "inline-block";
+      // Clear button always visible
       if (fileHelp)
         fileHelp.innerHTML = `<span style="color: #4CAF50;">✓ Using ${this.duckNames.length} names from file. Click Clear to use random names instead.</span>`;
     } else {
       if (fileLabel) fileLabel.textContent = "Racer List File (CSV/Excel):";
-      if (clearBtn) clearBtn.style.display = "none";
+      // Clear button always visible
       if (fileHelp)
         fileHelp.innerHTML =
           "Upload CSV/Excel to use custom names, or leave empty for random names";
@@ -3608,12 +3608,12 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     if (fileName) {
       if (audioLabel)
         audioLabel.innerHTML = `Custom Race Sound <span style="color: #2ed573;">(✓ Loaded: ${fileName})</span>:`;
-      if (clearBtn) clearBtn.style.display = "inline-block";
+      // Clear button always visible
       // Save to localStorage
       localStorage.setItem("customAudioFileName", fileName);
     } else {
       if (audioLabel) audioLabel.innerHTML = "Custom Race Sound (MP3):";
-      if (clearBtn) clearBtn.style.display = "none";
+      // Clear button always visible
       // Remove from localStorage
       localStorage.removeItem("customAudioFileName");
     }
