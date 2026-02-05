@@ -753,6 +753,7 @@ class Game {
     this.raceFinished = false;
     this.racePaused = false;
     this.animationId = null;
+    this.countdownInterval = null; // For results countdown
     this.startTime = null;
     this.pausedTime = 0;
     this.rankings = [];
@@ -3180,16 +3181,27 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
   }
 
   async detectAllFolders() {
-    // output_3 có 7 folders từ 1 đến 7
+    // Auto-detect folders từ 1 đến n
     const folders = [];
-    const totalFolders = 7;
+    const maxCheck = 50; // Check tối đa 50 folders
+    let consecutiveFails = 0;
+    const maxFails = 3; // Dừng sau 3 lần fail liên tiếp
 
-    for (let i = 1; i <= totalFolders; i++) {
+    for (let i = 1; i <= maxCheck; i++) {
       const folderName = String(i);
       const hasFiles = await this.checkFolderExists(folderName);
 
       if (hasFiles) {
         folders.push(folderName);
+        consecutiveFails = 0;
+      } else {
+        consecutiveFails++;
+        if (consecutiveFails >= maxFails) {
+          console.log(
+            `Stopped checking at folder ${i} after ${maxFails} consecutive fails`,
+          );
+          break;
+        }
       }
     }
 
@@ -3198,55 +3210,37 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
   }
 
   async checkFolderExists(folderName) {
-    // Chỉ cần check file compressed_frame_1.png hoặc .webp
-    const extensions = ["webp", "png"];
+    // Chỉ check file compressed_frame_1.webp
+    const fileName = `compressed_frame_1.webp`;
+    const exists = await new Promise((resolve) => {
+      const testImg = new Image();
+      testImg.src = `${this.currentTheme}/${folderName}/${fileName}`;
+      const timeout = setTimeout(() => resolve(false), 100);
 
-    for (const ext of extensions) {
-      const fileName = `compressed_frame_1.${ext}`;
-      const exists = await new Promise((resolve) => {
-        const testImg = new Image();
-        testImg.src = `${this.currentTheme}/${folderName}/${fileName}`;
-        const timeout = setTimeout(() => resolve(false), 100);
+      testImg.onload = () => {
+        clearTimeout(timeout);
+        resolve(true);
+      };
+      testImg.onerror = () => {
+        clearTimeout(timeout);
+        resolve(false);
+      };
+    });
 
-        testImg.onload = () => {
-          clearTimeout(timeout);
-          resolve(true);
-        };
-        testImg.onerror = () => {
-          clearTimeout(timeout);
-          resolve(false);
-        };
-      });
-
-      if (exists) {
-        return true;
-      }
-    }
-    return false;
+    return exists;
   }
 
   async detectAllFilesInFolder(folderName) {
-    // Mỗi folder có 5 file: compressed_frame_1.png đến compressed_frame_5.png
+    // Mỗi folder có 5 file webp: compressed_frame_1.webp đến compressed_frame_5.webp
     const files = [];
     const totalFrames = 5;
-    const extensions = ["webp", "png"];
 
     for (let num = 1; num <= totalFrames; num++) {
-      let foundFile = null;
+      const fileName = `compressed_frame_${num}.webp`;
+      const exists = await this.checkFileExists(folderName, fileName);
 
-      // Thử webp trước (ưu tiên), sau đó thử png
-      for (const ext of extensions) {
-        const fileName = `compressed_frame_${num}.${ext}`;
-        const exists = await this.checkFileExists(folderName, fileName);
-
-        if (exists) {
-          foundFile = fileName;
-          break;
-        }
-      }
-
-      if (foundFile) {
-        files.push(foundFile);
+      if (exists) {
+        files.push(fileName);
       } else {
         console.warn(`Missing frame ${num} in folder ${folderName}`);
       }
@@ -4864,11 +4858,9 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         }
 
         // Don't show popup - only show result panel
-        // Show result panel immediately after race ends
+        // Show result panel after countdown
         if (!this.isDisplayMode) {
-          setTimeout(() => {
-            this.showWinnersPanel();
-          }, 1000);
+          this.showResultsCountdown(5);
         }
       }
     }
@@ -4894,16 +4886,33 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       timestamp: new Date().toLocaleString("vi-VN"),
     });
 
-    // Update UI
-    safeElementAction("raceStatus", (el) => (el.textContent = "Finished!"));
+    // Update UI - Start countdown
+    this.showResultsCountdown(5);
     safeElementAction("timeLeft", (el) => (el.textContent = "0s"));
-    safeElementAction("pauseBtn", (el) => (el.disabled = true));
 
-    // Show Next Race button after race finishes
-    safeElementAction(
-      "nextRaceBtn",
-      (el) => (el.style.display = "inline-block"),
-    );
+    // Disable all control buttons except Next button to prevent user errors
+    safeElementAction("controlStartBtn", (el) => {
+      el.disabled = true;
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
+    safeElementAction("pauseBtn", (el) => {
+      el.disabled = true;
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
+    safeElementAction("resumeBtn", (el) => {
+      el.disabled = true;
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
+    safeElementAction("resetHistoryBtn", (el) => {
+      el.disabled = true;
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
+
+    // Next Race button will be shown after result panel is displayed
   }
 
   updateControlPanelTimer() {
@@ -5738,14 +5747,12 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
             continue; // Skip this duck, still in cooldown
           }
 
-          // Don't perform last-moment lane switches when too close to finish
-          const FINISH_SAFE_ZONE = this.finishSafeZone ?? 80; // pixels (nullish coalescing keeps 0 as valid)
-          if (
-            duck.position >=
-            this.trackLength - FINISH_LINE_OFFSET - FINISH_SAFE_ZONE
-          ) {
-            continue; // Too close to finish - keep lane to avoid jumpy behavior
-          }
+          // Lane switching is now allowed at all positions (safe zone disabled)
+          // Previously: disabled lane switching near finish line to avoid jumpy behavior
+          // const FINISH_SAFE_ZONE = this.finishSafeZone ?? 80;
+          // if (duck.position >= this.trackLength - FINISH_LINE_OFFSET - FINISH_SAFE_ZONE) {
+          //   continue;
+          // }
 
           // Find least crowded ADJACENT lane (only +1 or -1 from current lane)
           const possibleLanes = [];
@@ -6459,11 +6466,9 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       }
 
       // Don't show popup - only show result panel
-      // Show result panel immediately
+      // Show result panel after countdown
       if (!this.isDisplayMode) {
-        setTimeout(() => {
-          this.showWinnersPanel();
-        }, 1000);
+        this.showResultsCountdown(5);
       }
     }
 
@@ -6484,33 +6489,34 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       timestamp: new Date().toLocaleString("vi-VN"),
     });
 
-    safeElementAction("raceStatus", (el) => (el.textContent = "Finished!"));
+    // Start countdown before showing results (standalone mode)
+    this.showResultsCountdown(5);
     safeElementAction("timeLeft", (el) => (el.textContent = "0s"));
-    safeElementAction("pauseBtn", (el) => (el.disabled = true));
 
-    const resultPanel = document.getElementById("resultPanel");
-    if (resultPanel) resultPanel.classList.remove("hidden");
+    // Disable all control buttons except Next button to prevent user errors
+    safeElementAction("controlStartBtn", (el) => {
+      el.disabled = true;
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
+    safeElementAction("pauseBtn", (el) => {
+      el.disabled = true;
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
+    safeElementAction("resumeBtn", (el) => {
+      el.disabled = true;
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
+    safeElementAction("resetHistoryBtn", (el) => {
+      el.disabled = true;
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
 
-    safeElementAction(
-      "resultTitle",
-      (el) =>
-        (el.innerHTML = `🏆 Race Finished! <span style="font-size:0.6em;color:#888;">(Top ${this.winnerCount})</span>`),
-    );
-
-    let resultHTML = `
-            <div class="result-winner">
-                <h3>🏆 Winner: ${winner.name} 🏆</h3>
-                <div style="width:30px;height:30px;background:${winner.color};border-radius:50%;margin:10px auto;"></div>
-            </div>
-            <div class="result-stats">
-                <p><strong>Top 3:</strong></p>
-                <p>🥇 ${this.rankings[0].name} - ${((this.rankings[0].position / this.trackLength) * 100).toFixed(1)}%</p>
-                <p>🥈 ${this.rankings[1].name} - ${((this.rankings[1].position / this.trackLength) * 100).toFixed(1)}%</p>
-                <p>🥉 ${this.rankings[2].name} - ${((this.rankings[2].position / this.trackLength) * 100).toFixed(1)}%</p>
-            </div>
-        `;
-
-    document.getElementById("resultMessage").innerHTML = resultHTML;
+    // Result panel will be shown by countdown after 5 seconds
+    // No need to show it immediately here as showResultsCountdown() handles it
   }
 
   // showVictoryPopup(winner) {
@@ -6894,6 +6900,12 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
   nextRace() {
     console.log("Next Race - Resetting display to waiting screen");
 
+    // Clear countdown interval if running
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+      this.countdownInterval = null;
+    }
+
     // Hide popup on display if showing
     if (this.displayChannel) {
       this.displayChannel.postMessage({
@@ -6910,12 +6922,45 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       });
     }
 
-    // Hide Next Race button
-    safeElementAction("nextRaceBtn", (el) => (el.style.display = "none"));
+    // Hide Next Race button and remove blinking effect
+    safeElementAction("nextRaceBtn", (el) => {
+      el.style.display = "none";
+      el.classList.remove("btn-blinking");
+    });
+
+    // Re-enable all control buttons for next race
+    safeElementAction("controlStartBtn", (el) => {
+      el.disabled = false;
+      el.style.opacity = "1";
+      el.style.cursor = "pointer";
+    });
+    safeElementAction("pauseBtn", (el) => {
+      el.disabled = false;
+      el.style.opacity = "1";
+      el.style.cursor = "pointer";
+    });
+    safeElementAction("resumeBtn", (el) => {
+      el.disabled = true; // Will be enabled when paused
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
+    safeElementAction("resetHistoryBtn", (el) => {
+      el.disabled = false;
+      el.style.opacity = "1";
+      el.style.cursor = "pointer";
+    });
 
     // Hide result panel on control
     const resultPanel = document.getElementById("resultPanel");
     if (resultPanel) resultPanel.classList.add("hidden");
+
+    // Reset race status display
+    safeElementAction("raceStatus", (el) => {
+      el.textContent = "Waiting";
+      el.style.color = "";
+      el.style.fontWeight = "";
+      el.style.fontSize = "";
+    });
 
     console.log("✓ Display reset to waiting screen, ready for next race");
   }
@@ -6986,7 +7031,9 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     html += "</div>";
     html += '<div class="result-actions" id="resultActions">';
     html +=
-      '<button class="btn btn-secondary" onclick="game.sendResultsToDisplay()">📺 Send to Display</button>';
+      '<button class="btn btn-secondary" onclick="game.sendResultsToDisplay()">📺 SEND TO DISPLAY</button>';
+    html +=
+      '<button class="btn btn-secondary" onclick="game.resetHistory()" style="background: #e74c3c; margin-left: 10px;">🗑️ CLEAR HISTORY</button>';
     html += "</div>";
 
     document.getElementById("resultMessage").innerHTML = html;
@@ -6998,6 +7045,47 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
 
     // Play celebration sound
     this.soundManager.playCrowdCheer();
+  }
+
+  // Countdown before showing results panel
+  showResultsCountdown(seconds) {
+    let remaining = seconds;
+    const raceStatusEl = document.getElementById("raceStatus");
+
+    if (!raceStatusEl) return;
+
+    // Clear any existing countdown interval
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+    }
+
+    // Update countdown display
+    const updateCountdown = () => {
+      if (remaining > 0) {
+        raceStatusEl.textContent = `🏁 Calculating results... ${remaining}s`;
+        raceStatusEl.style.color = "#f39c12";
+        raceStatusEl.style.fontWeight = "bold";
+        raceStatusEl.style.fontSize = "1.2em";
+        remaining--;
+      } else {
+        // Countdown finished
+        clearInterval(this.countdownInterval);
+        this.countdownInterval = null;
+        raceStatusEl.textContent = "Finished!";
+        raceStatusEl.style.color = "";
+        raceStatusEl.style.fontWeight = "";
+        raceStatusEl.style.fontSize = "";
+
+        // Show results panel
+        this.showWinnersPanel();
+      }
+    };
+
+    // Start countdown immediately
+    updateCountdown();
+
+    // Update every second
+    this.countdownInterval = setInterval(updateCountdown, 1000);
   }
 
   showWinnersPanel() {
@@ -7036,9 +7124,9 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     html += "</div>";
     html += '<div class="result-actions" id="resultActions">';
     html +=
-      '<button class="btn btn-secondary" onclick="game.sendResultsToDisplay()">📺 Send to Display</button>';
+      '<button class="btn btn-secondary" onclick="game.sendResultsToDisplay()">📺 SEND TO DISPLAY</button>';
     html +=
-      '<button class="btn btn-secondary" onclick="game.resetHistory()">🗑️ Clear History</button>';
+      '<button class="btn btn-secondary" onclick="game.resetHistory()" style="background: #e74c3c; margin-left: 10px;">🗑️ CLEAR HISTORY</button>';
     html += "</div>";
 
     document.getElementById("resultMessage").innerHTML = html;
@@ -7047,6 +7135,12 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     setTimeout(() => {
       resultPanel.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
+
+    // Show Next Race button with blinking effect after result panel is displayed
+    safeElementAction("nextRaceBtn", (el) => {
+      el.style.display = "inline-block";
+      el.classList.add("btn-blinking");
+    });
   }
 
   sendResultsToDisplay() {
@@ -7082,6 +7176,12 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         "⚠️ RESTART: Xóa toàn bộ lịch sử, scripts và reset game về trạng thái ban đầu?\n\nKhông thể hoàn tác!",
       )
     ) {
+      // Clear countdown interval if running
+      if (this.countdownInterval) {
+        clearInterval(this.countdownInterval);
+        this.countdownInterval = null;
+      }
+
       this.winners = [];
       this.activeDuckNames = [...this.duckNames];
       this.usedPrizesCount = 0; // Reset prize counter

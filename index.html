@@ -241,6 +241,85 @@
           </small>
         </div>
 
+        <!-- Control Panel (for control window) -->
+        <div
+          class="control-panel"
+          id="controlPanel"
+          style="
+            margin-top: 20px;
+            position: relative;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+          "
+        >
+          <!-- <button class="btn btn-small" onclick="game.goHome()" id="homeBtn">
+            🏠 Home
+          </button> -->
+          <div class="input-group">
+            <label for="raceDuration" style="font-size: 16px; font-weight: bold"
+              >Race Duration (seconds):</label
+            >
+            <input
+              type="number"
+              id="raceDuration"
+              min="5"
+              max="300"
+              value="30"
+              style="font-size: 18px; padding: 12px; font-weight: bold"
+            />
+          </div>
+          <button
+            class="btn btn-small"
+            onclick="game.controlStartRace()"
+            id="controlStartBtn"
+            disabled
+          >
+            Loading...
+          </button>
+          <button
+            class="btn btn-small"
+            onclick="game.pauseRace()"
+            id="pauseBtn"
+          >
+            ⏸ Pause
+          </button>
+          <button
+            class="btn btn-small"
+            onclick="game.resumeRace()"
+            id="resumeBtn"
+            disabled
+          >
+            ▶ Resume
+          </button>
+          <button
+            class="btn btn-primary"
+            onclick="game.continueRace()"
+            id="continueBtn"
+            style="display: none"
+          >
+            🎯 Next Race
+          </button>
+          <button
+            class="btn btn-primary"
+            onclick="game.nextRace()"
+            id="nextRaceBtn"
+            style="display: none; background: #3498db"
+          >
+            ➡️ Next Race
+          </button>
+          <button
+            class="btn btn-secondary"
+            onclick="game.resetHistory()"
+            id="resetHistoryBtn"
+            style="background: #e74c3c"
+          >
+            🔄 Restart
+          </button>
+        </div>
+        <!-- end control panel -->
+
         <!-- File Upload Section - Enlarged and Highlighted -->
         <div
           style="
@@ -607,92 +686,6 @@
           </div>
           <!-- end displayContainer -->
         </div>
-
-        <!-- Control Panel (for control window) -->
-        <div
-          class="control-panel"
-          id="controlPanel"
-          style="
-            margin-top: 20px;
-            position: relative;
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            flex-wrap: wrap;
-          "
-        >
-          <!-- <button class="btn btn-small" onclick="game.goHome()" id="homeBtn">
-            🏠 Home
-          </button> -->
-          <div class="input-group">
-            <label for="raceDuration" style="font-size: 16px; font-weight: bold"
-              >Race Duration (seconds):</label
-            >
-            <input
-              type="number"
-              id="raceDuration"
-              min="5"
-              max="300"
-              value="30"
-              style="font-size: 18px; padding: 12px; font-weight: bold"
-            />
-          </div>
-          <button
-            class="btn btn-small"
-            onclick="game.controlStartRace()"
-            id="controlStartBtn"
-            disabled
-          >
-            Loading...
-          </button>
-          <button
-            class="btn btn-small"
-            onclick="game.pauseRace()"
-            id="pauseBtn"
-          >
-            ⏸ Pause
-          </button>
-          <button
-            class="btn btn-small"
-            onclick="game.resumeRace()"
-            id="resumeBtn"
-            disabled
-          >
-            ▶ Resume
-          </button>
-          <button
-            class="btn btn-primary"
-            onclick="game.continueRace()"
-            id="continueBtn"
-            style="display: none"
-          >
-            🎯 Next Race
-          </button>
-          <button
-            class="btn btn-primary"
-            onclick="game.nextRace()"
-            id="nextRaceBtn"
-            style="display: none; background: #3498db"
-          >
-            ➡️ Next Race
-          </button>
-          <button
-            class="btn btn-secondary"
-            onclick="game.showWinnersPanel()"
-            id="viewResultsBtn"
-          >
-            📋 View Results
-          </button>
-          <button
-            class="btn btn-secondary"
-            onclick="game.resetHistory()"
-            id="resetHistoryBtn"
-            style="background: #e74c3c"
-          >
-            🔄 Restart
-          </button>
-        </div>
-        <!-- end control panel -->
       </div>
       <!-- end game settings -->
 
