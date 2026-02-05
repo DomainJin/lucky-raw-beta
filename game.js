@@ -869,7 +869,7 @@ class Game {
     }
 
     // Performance optimization - viewport culling
-    this.viewportBuffer = 800; // Render ducks 800px outside viewport (increased for smoother large races)
+    this.viewportBuffer = 500; // Render ducks 500px outside viewport
     this.visibleDucks = new Set(); // Track which ducks are currently visible
 
     // Canvas rendering for large races (performance boost)
@@ -5041,15 +5041,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     }
 
     // Smooth delta time with exponential moving average to reduce jitter
-    // Adaptive smoothing: increase for large races
-    const duckCount = this.ducks.length;
-    let smoothingFactor = 0.85; // Base smoothing (0-1, higher = more smoothing)
-    if (duckCount > 1500) {
-      smoothingFactor = 0.92; // Much higher smoothing for 1500+ ducks
-    } else if (duckCount > 500) {
-      smoothingFactor = 0.88; // Higher smoothing for 500+ ducks
-    }
-
+    const smoothingFactor = 0.85; // Higher = more smoothing (0-1)
     this.smoothedDeltaTime =
       this.smoothedDeltaTime * smoothingFactor +
       this.deltaTime * (1 - smoothingFactor);
@@ -5236,7 +5228,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     const viewportStart = this.cameraOffset - this.viewportBuffer;
     const viewportEnd =
       this.cameraOffset + this.viewportWidth + this.viewportBuffer;
-    // duckCount already declared at line 5045
+    const duckCount = this.ducks.length;
     const isLargeRace = duckCount > 100;
     const isVeryLargeRace = duckCount > 500;
 
@@ -5502,15 +5494,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
 
       // INERTIA: Smoothly interpolate current velocity toward target velocity
       // High inertia = smooth movement, low responsiveness
-      // Adaptive inertia: increase smoothing for large races to reduce jitter
-      // duckCount already declared at line 5045
-      let inertiaFactor = 0.95; // Base inertia
-      if (duckCount > 1500) {
-        inertiaFactor = 0.98; // Much higher smoothing for 1500+ ducks
-      } else if (duckCount > 500) {
-        inertiaFactor = 0.97; // Higher smoothing for 500+ ducks
-      }
-
+      const inertiaFactor = 0.95; // Increased from 0.92 for even smoother camera movement
       const oldVelocity = this.cameraVelocity;
       this.cameraVelocity =
         this.cameraVelocity * inertiaFactor +
@@ -5720,23 +5704,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     });
 
     // Lane management for top ducks approaching finish line
-    // Throttle lane management for large races to reduce jitter
-    // duckCount and isVeryLargeRace already available as function parameters
-    const isExtremeRace = duckCount > 1500;
-
-    // Skip frames for lane management in large races
-    if (!this.laneManagementCounter) this.laneManagementCounter = 0;
-    this.laneManagementCounter++;
-
-    const shouldManageLanes = isExtremeRace
-      ? this.laneManagementCounter % 5 === 0 // Every 5 frames for 1500+ ducks
-      : isVeryLargeRace
-        ? this.laneManagementCounter % 3 === 0 // Every 3 frames for 500+ ducks
-        : true; // Every frame for smaller races
-
-    if (shouldManageLanes) {
-      this.manageLanes();
-    }
+    this.manageLanes();
   }
 
   manageLanes() {
@@ -5750,18 +5718,9 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     if (distanceToFinish > laneManagementZone) return;
 
     const currentTime = Date.now();
-    const raceDuckCount = this.ducks.length;
 
-    // Adjust parameters based on race size to reduce jitter
-    const isLargeRace = duckCount > 500;
-    const isExtremeRace = duckCount > 1500;
-
-    // Reduce number of ducks managed in large races
-    const topDuckCount = isExtremeRace
-      ? Math.min(10, this.rankings.length) // Only top 10 for 1500+ ducks
-      : isLargeRace
-        ? Math.min(15, this.rankings.length) // Top 15 for 500+ ducks
-        : Math.min(20, this.rankings.length); // Top 20 for normal races
+    // Get top ducks in finish zone
+    const topDuckCount = Math.min(20, this.rankings.length);
     const topDucks = this.rankings.slice(0, topDuckCount);
 
     // Group ducks by their current lane
