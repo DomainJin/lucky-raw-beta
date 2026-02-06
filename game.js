@@ -3399,17 +3399,21 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
 
           // Bỏ qua header (dòng 0), đọc từ dòng 1
           // Cột 0: STT, Cột 1: Mã NV, Cột 2: Họ và tên
+          // CHỈ kiểm tra cột 2 (name) - cột 1 (code) có thể trống
           for (let i = 1; i < jsonData.length; i++) {
             const row = jsonData[i];
-            if (row && row.length >= 3 && row[1] && row[2]) {
-              const code = String(row[1]).trim(); // Mã NV
+            // Chỉ cần cột 2 (name) có giá trị
+            if (row && row[2]) {
+              const code = row[1] ? String(row[1]).trim() : ""; // Mã NV (có thể trống)
               const name = String(row[2]).trim(); // Họ và tên
-              if (code && name) {
+              if (name) {
                 // Internal name is just the full name
                 this.duckNames.push(name);
                 // Store code separately for display
                 this.duckCodes.push(code);
-                console.log(`Loaded row ${i}: Code=${code}, Name=${name}`);
+                console.log(
+                  `Loaded row ${i}: Code=${code || "(empty)"}, Name=${name}`,
+                );
               }
             }
           }
@@ -3458,15 +3462,16 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         this.duckCodes = [];
 
         // Cột 0: STT, Cột 1: Mã NV, Cột 2: Họ và tên
+        // CHỈ kiểm tra cột 2 (name) - cột 1 (code) có thể trống
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
           if (!line) continue;
 
           const columns = line.split(",");
           if (columns.length >= 3) {
-            const code = columns[1].trim(); // Mã NV
+            const code = columns[1] ? columns[1].trim() : ""; // Mã NV (có thể trống)
             const name = columns[2].trim(); // Họ và tên
-            if (code && name) {
+            if (name) {
               this.duckNames.push(name);
               this.duckCodes.push(code);
             }

@@ -107,7 +107,7 @@
         max-height: 100vh !important;
         max-width: calc(100vh * 20 / 5) !important;
         margin: 0 !important;
-        border-radius: 20px !important;
+        /* border-radius: 20px !important; */
         z-index: 9999 !important;
         flex-direction: column !important;
         justify-content: center !important;
@@ -162,7 +162,7 @@
         max-width: 200px !important;
         width: 100% !important;
         padding: 2% !important;
-        border-radius: 8px !important;
+        /* border-radius: 8px !important; */
         box-sizing: border-box !important;
         display: flex !important;
         flex-direction: column !important;
@@ -352,7 +352,7 @@
         left: 0 !important;
         width: 100% !important;
         height: 100% !important;
-        border-radius: 20px !important;
+        /* border-radius: 20px !important; */
       }
 
       /* Victory content - circular shape, diameter = height of race-track */
@@ -400,7 +400,7 @@
         padding: 3% !important;
         margin: 0 !important;
         margin-bottom: 3% !important;
-        border-radius: 50% !important;
+        /* border-radius: 50% !important; */
         width: auto !important;
         height: 90% !important;
         aspect-ratio: 1 / 1 !important;
@@ -457,19 +457,19 @@
         width: 95% !important;
         height: 90% !important;
         aspect-ratio: auto !important;
-        /* border-radius: 20px !important; */
+        border-radius: 0 !important;
         padding: 1.5% !important;
-        /* background: linear-gradient(
+        background: linear-gradient(
           135deg,
-          #ff512f 0%,
-          #f09819 100%
-        ) !important;  */
-        background: url("static/popup.png") center / cover no-repeat !important;
-        /* Đỏ cam */
+          rgba(255, 81, 47, 0.85) 0%,
+          rgba(240, 152, 25, 0.85) 100%
+        ) !important;
+        /* Xóa background image để không che card */
+        background: url("static/popup.png") !important;
+        /* Box shadow chữ nhật - không blur nhiều */
         box-shadow:
-          0 15px 40px rgba(0, 0, 0, 0.4),
-          inset 0 0 50px rgba(0, 0, 0, 0.3),
-          0 0 50px rgba(102, 126, 234, 0.3) !important;
+          0 10px 30px rgba(0, 0, 0, 0.5),
+          inset 0 0 30px rgba(0, 0, 0, 0.2) !important;
         display: flex !important;
         flex-direction: column !important;
         overflow: hidden !important;
@@ -518,7 +518,7 @@
 
       .topn-winner-card {
         background: transparent !important;
-        border-radius: 12px !important;
+        /* border-radius: 12px !important; */
         width: fit-content !important;
         max-width: none !important; /* bỏ giới hạn 150px */
         min-width: 100px !important; /* giữ min cho đẹp layout */
@@ -538,7 +538,7 @@
       }
 
       .topn-winner-medal {
-        font-size: clamp(1.5em, 3vw, 2.5em) !important;
+        font-size: clamp(3em, 6vw, 6em) !important;
         margin: 0.1em 0 !important;
         line-height: 1 !important;
         animation: winnerSpin 2s ease-in-out infinite !important;
@@ -546,8 +546,8 @@
       }
 
       .topn-winner-icon {
-        width: clamp(40px, 5vw, 60px) !important;
-        height: clamp(40px, 5vw, 60px) !important;
+        width: clamp(240px, 10vw, 240px) !important;
+        height: clamp(240px, 10vw, 240px) !important;
         margin: 0.2em 0 !important;
         display: flex !important;
         align-items: center !important;
@@ -563,7 +563,7 @@
       }
 
       .topn-winner-position {
-        font-size: clamp(0.75em, 1.1vw, 0.95em) !important;
+        font-size: clamp(1.7em, 3vw, 2em) !important;
         font-weight: bold !important;
         color: #82dd0b !important;
         margin: 0.2em 0 !important;
@@ -578,7 +578,7 @@
       }
 
       .topn-winner-code {
-        font-size: clamp(0.85em, 0.8vw, 0.95em) !important;
+        font-size: clamp(1em, 1vw, 3em) !important;
         font-weight: 700 !important;
         color: #ffd700 !important;
         margin: 0.15em 0 !important;
@@ -591,7 +591,7 @@
       }
 
       .topn-winner-name {
-        font-size: clamp(1em, 1vw, 1em) !important;
+        font-size: clamp(1em, 1vw, 3em) !important;
         font-weight: 600 !important;
         color: #ffffff !important;
         margin: 0.2em 0 !important;

@@ -42,15 +42,19 @@ export class FileManager {
 
         // Bỏ qua header (dòng 0), đọc từ dòng 1
         // Cột 0: STT, Cột 1: Mã NV, Cột 2: Họ và tên
+        // CHỈ kiểm tra cột 2 (name) - cột 1 (code) có thể trống
         for (let i = 1; i < jsonData.length; i++) {
           const row = jsonData[i];
-          if (row && row.length >= 3 && row[1] && row[2]) {
-            const code = String(row[1]).trim();
+          // Chỉ cần cột 2 (name) có giá trị
+          if (row && row[2]) {
+            const code = row[1] ? String(row[1]).trim() : "";
             const name = String(row[2]).trim();
-            if (code && name) {
+            if (name) {
               this.game.duckNames.push(name);
               this.game.duckCodes.push(code);
-              console.log(`Loaded row ${i}: Code=${code}, Name=${name}`);
+              console.log(
+                `Loaded row ${i}: Code=${code || "(empty)"}, Name=${name}`,
+              );
             }
           }
         }
@@ -74,15 +78,16 @@ export class FileManager {
       this.game.duckCodes = [];
 
       // Cột 0: STT, Cột 1: Mã NV, Cột 2: Họ và tên
+      // CHỈ kiểm tra cột 2 (name) - cột 1 (code) có thể trống
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
 
         const columns = line.split(",");
         if (columns.length >= 3) {
-          const code = columns[1].trim();
+          const code = columns[1] ? columns[1].trim() : "";
           const name = columns[2].trim();
-          if (code && name) {
+          if (name) {
             this.game.duckNames.push(name);
             this.game.duckCodes.push(code);
           }

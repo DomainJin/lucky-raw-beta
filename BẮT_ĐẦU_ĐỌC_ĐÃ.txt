@@ -1,0 +1,47 @@
+# ⚠️ CẦN CÀI ĐẶT TRƯỚC KHI CHẠY
+
+## Lucky Racer cần 1 trong 2:
+
+### 🟢 Lựa chọn 1: Node.js (ĐỀ XUẤT)
+- **Tải:** https://nodejs.org/
+- Nhấn nút **"LTS"** màu xanh
+- Cài đặt bình thường (Next → Next → Install)
+- **Khởi động lại máy** sau khi cài
+
+### 🟡 Lựa chọn 2: Python 3  
+- **Tải:** https://www.python.org/downloads/
+- ⚠️ **QUAN TRỌNG:** Khi cài, tick vào:
+  - ☑️ **"Add Python to PATH"**
+- Cài đặt
+- **Khởi động lại máy** sau khi cài
+
+---
+
+## ▶️ Cách chạy sau khi cài:
+
+### Windows:
+1. Double-click `start.bat`
+2. Chờ browser tự mở
+3. Hoặc truy cập: http://localhost:8000
+
+### Mac/Linux:
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+---
+
+## 📖 Hướng dẫn chi tiết:
+- Xem file **`INSTALL_GUIDE.md`** (tiếng Anh)
+- Hoặc **`README_OFFLINE.md`** (tiếng Việt/Anh)
+
+---
+
+## ❓ Không chạy được?
+
+1. Đã cài Node.js hoặc Python chưa?
+2. Đã khởi động lại máy chưa?
+3. Thử click phải `start.bat` → **"Run as administrator"**
+
+Chi tiết: xem `INSTALL_GUIDE.md`
