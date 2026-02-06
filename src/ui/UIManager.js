@@ -256,6 +256,15 @@ ${this.game.prizeManager.prizeRaceList.length > 0 ? this.game.prizeManager.prize
 
   // Result Panel Background & Settings
   applyRaceTrackAspectRatio(width, height) {
+    // Set CSS variables so the layout uses the dynamic values
+    document.documentElement.style.setProperty("--track-w", width);
+    document.documentElement.style.setProperty("--track-h", height);
+    document.documentElement.style.setProperty(
+      "--track-aspect",
+      `${width}/${height}`,
+    );
+
+    // For backward compatibility, keep an injected style that mirrors the values
     const styleId = "dynamic-aspect-ratio";
     let styleEl = document.getElementById(styleId);
 

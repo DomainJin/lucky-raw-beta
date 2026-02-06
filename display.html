@@ -7,6 +7,12 @@
     <link rel="stylesheet" href="style.css?v=43" />
     <style>
       /* Custom butterfly cursor */
+      :root {
+        --track-w: 20; /* default width ratio */
+        --track-h: 5; /* default height ratio */
+        --track-aspect: 20/5; /* default aspect as string (width/height) */
+      }
+
       body {
         margin: 0;
         padding: 0;
@@ -280,9 +286,10 @@
         left: 50%;
         transform: translate(-50%, -50%);
         width: 100vw;
-        height: calc(100vw * 5 / 20); /* 20:5 aspect ratio (4:1) */
+        /* Height and max-width computed from CSS variables so aspect can be changed dynamically */
+        height: calc(100vw * var(--track-h) / var(--track-w));
         max-height: 100vh;
-        max-width: calc(100vh * 20 / 5);
+        max-width: calc(100vh * var(--track-w) / var(--track-h));
         z-index: 10;
       }
 
@@ -293,9 +300,10 @@
         left: 50%;
         transform: translate(-50%, -50%);
         width: 100vw;
-        height: calc(100vw * 5 / 20); /* Match race-track aspect ratio */
+        /* Use CSS variables for dynamic aspect ratio */
+        height: calc(100vw * var(--track-h) / var(--track-w));
         max-height: 100vh;
-        max-width: calc(100vh * 20 / 5);
+        max-width: calc(100vh * var(--track-w) / var(--track-h));
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -331,18 +339,15 @@
         transform: translate(-50%, -50%) !important;
         width: 100vw !important;
         height: calc(
-          100vw * 5 / 20
+          100vw * var(--track-h) / var(--track-w)
         ) !important; /* Match race-track aspect ratio */
         max-height: 100vh !important;
-        max-width: calc(100vh * 20 / 5) !important;
+        max-width: calc(100vh * var(--track-w) / var(--track-h)) !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        background: linear-gradient(
-          135deg,
-          #ffe259 0%,
-          #f6d365 100%
-        ) !important; /* Vàng sáng */
+        background: none !important; /* Remove gradient background */
+        background-image: url("static/popup.png") !important;
       }
 
       /* Victory overlay - fill entire popup container */
@@ -366,13 +371,16 @@
           #ff512f 0%,
           #f09819 100%
         ) !important;  */
-        /* Đỏ cam */
-        background: url("static/popup.png") center / cover no-repeat !important;
+        /* Nền popup đã bị loại bỏ để tránh che card thắng */
+        background: transparent !important;
+        background-image: none !important;
+        background-position: center center !important;
+        background-size: auto !important;
+        background-repeat: no-repeat !important;
+        background-attachment: scroll !important;
+        position: relative !important;
 
-        box-shadow:
-          0 15px 40px rgba(0, 0, 0, 0.4),
-          inset 0 0 50px rgba(0, 0, 0, 0.3),
-          0 0 50px rgba(102, 126, 234, 0.3) !important;
+        box-shadow: none !important;
         overflow: visible !important;
         display: flex !important;
         flex-direction: column !important;
@@ -459,13 +467,14 @@
         aspect-ratio: auto !important;
         border-radius: 0 !important;
         padding: 1.5% !important;
-        background: linear-gradient(
-          135deg,
-          rgba(255, 81, 47, 0.85) 0%,
-          rgba(240, 152, 25, 0.85) 100%
-        ) !important;
-        /* Xóa background image để không che card */
-        background: url("static/popup.png") !important;
+        /* Loại bỏ nền cam/oval và background image */
+        background: transparent !important;
+        background-image: none !important;
+        background-position: center center !important;
+        background-size: auto !important; /* no cover */
+        background-repeat: no-repeat !important;
+        background-attachment: scroll !important;
+        box-shadow: none !important;
         /* Box shadow chữ nhật - không blur nhiều */
         box-shadow:
           0 10px 30px rgba(0, 0, 0, 0.5),

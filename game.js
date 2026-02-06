@@ -2383,12 +2383,15 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
   }
 
   applyRaceTrackAspectRatio(width, height) {
-    const raceTrack = document.getElementById("raceTrack");
-    const resultPanel = document.getElementById("resultPanel");
-    const victoryPopup = document.getElementById("victoryPopup");
-    const loadingDisplay = document.getElementById("loadingDisplay");
+    // Set CSS variables so the layout uses the dynamic values
+    document.documentElement.style.setProperty("--track-w", width);
+    document.documentElement.style.setProperty("--track-h", height);
+    document.documentElement.style.setProperty(
+      "--track-aspect",
+      `${width}/${height}`,
+    );
 
-    // Create CSS rule for aspect ratio
+    // For backward compatibility, keep an injected style that mirrors the values
     const styleId = "dynamic-aspect-ratio";
     let styleEl = document.getElementById(styleId);
 
