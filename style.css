@@ -2333,6 +2333,17 @@ h1 {
     0 0 60px rgba(102, 126, 234, 0.5);
 }
 
+.winner-duck-code {
+  font-size: clamp(0.55em, 0.8vw, 0.85em);
+  font-weight: 700;
+  color: #ffd700;
+  margin: 0.1em 0;
+  text-shadow:
+    0 2px 4px rgba(0, 0, 0, 1),
+    0 0 10px rgba(255, 215, 0, 0.6);
+  text-align: center;
+}
+
 .winner-duck-name {
   font-size: clamp(0.6em, 0.9vw, 0.95em);
   font-weight: 600;
@@ -2538,6 +2549,17 @@ h1 {
   text-align: center;
   width: 100%;
   white-space: nowrap;
+}
+
+.topn-winner-code {
+  font-size: clamp(0.55em, 0.9vw, 0.95em);
+  font-weight: 700;
+  color: #ffd700;
+  margin: 0.2em 0 0.1em 0;
+  text-align: center;
+  white-space: nowrap;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  line-height: 1.1;
 }
 
 .topn-winner-name {

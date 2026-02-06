@@ -463,7 +463,7 @@ class Duck {
     this.laneChangeInterval = 2000; // 2 seconds
     this.currentFrame = 0;
     this.lastFrameTime = 0;
-    this.animationFPS = 20; // Increased from 12 to 20 FPS for smoother animation
+    this.animationFPS = 12; // Increased from 12 to 20 FPS for smoother animation
 
     // Lane management for finish line collision avoidance
     this.lane = Math.floor(Math.random() * 5); // 0-4: 5 lanes for smoother transitions
@@ -1154,12 +1154,14 @@ class Game {
     return { center: bestCenter, count: bestCount };
   }
 
-  // Get display name with employee code (if available)
+  // Get employee code for display
+  getDisplayCode(duck) {
+    return duck.code || "";
+  }
+
+  // Get display name (without code)
   getDisplayName(duck) {
-    if (duck.code) {
-      return `${duck.code} - ${duck.name}`;
-    }
-    return duck.name;
+    return duck.name || "";
   }
 
   // loadPrizeNames() removed - prize names now come from scripts only
@@ -6691,12 +6693,16 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         }
       }
 
+      const displayCode = this.getDisplayCode(winner);
+      const displayName = this.getDisplayName(winner);
+
       winnersHTML += `
             <div class="topn-winner-card">
               <div class="topn-winner-medal">${medal}</div>
               <div class="topn-winner-icon">${iconHTML}</div>
               <div class="topn-winner-position">${prizeName}</div>
-              <div class="topn-winner-name">${this.getDisplayName(winner)}</div>
+              ${displayCode ? `<div class="topn-winner-code">${displayCode}</div>` : ""}
+              <div class="topn-winner-name">${displayName}</div>
             </div>
           `;
 
@@ -7014,12 +7020,16 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
           }
         }
 
+        const displayCode = this.getDisplayCode(winner);
+        const displayName = this.getDisplayName(winner);
+
         html += `
                     <div class="winner-card">
                         <div class="winner-medal">${medal}</div>
                         <div class="winner-icon-display">${iconHTML}</div>
                         <div class="winner-position">${prizeName}</div>
-                        <div class="winner-duck-name">${this.getDisplayName(winner)}</div>
+                        ${displayCode ? `<div class="winner-duck-code">${displayCode}</div>` : ""}
+                        <div class="winner-duck-name">${displayName}</div>
                     </div>
                 `;
       });
@@ -7108,11 +7118,15 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
           index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `🏅`;
         // Always use prizeName from winner object (set by script)
         const prizeName = winner.prizeName || this.currentScriptPrizeName || "";
+        const displayCode = this.getDisplayCode(winner);
+        const displayName = this.getDisplayName(winner);
+
         html += `
                     <div class="winner-card">
                         <div class="winner-medal">${medal}</div>
                         <div class="winner-position">${prizeName}</div>
-                        <div class="winner-duck-name">${this.getDisplayName(winner)}</div>
+                        ${displayCode ? `<div class="winner-duck-code">${displayCode}</div>` : ""}
+                        <div class="winner-duck-name">${displayName}</div>
                     </div>
                 `;
       });
@@ -7123,6 +7137,8 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
 
     html += "</div>";
     html += '<div class="result-actions" id="resultActions">';
+    html +=
+      '<button class="btn btn-primary" onclick="game.playAgain()" style="background: #27ae60; margin-right: 10px;">🔄 PLAY AGAIN</button>';
     html +=
       '<button class="btn btn-secondary" onclick="game.sendResultsToDisplay()">📺 SEND TO DISPLAY</button>';
     html +=
@@ -7141,6 +7157,57 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       el.style.display = "inline-block";
       el.classList.add("btn-blinking");
     });
+  }
+
+  playAgain() {
+    console.log("🔄 Play Again: Restarting race with same settings");
+
+    // Hide result panel
+    const resultPanel = document.getElementById("resultPanel");
+    if (resultPanel) {
+      resultPanel.classList.add("hidden");
+    }
+
+    // Hide Next Race button
+    safeElementAction("nextRaceBtn", (el) => {
+      el.style.display = "none";
+      el.classList.remove("btn-blinking");
+    });
+
+    // Reset race status
+    this.raceStarted = false;
+    this.raceFinished = false;
+    this.racePaused = false;
+    this.finishTime = null;
+
+    // Clear countdown interval if any
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+      this.countdownInterval = null;
+    }
+
+    // Reset race status display
+    const raceStatusEl = document.getElementById("raceStatus");
+    if (raceStatusEl) {
+      raceStatusEl.textContent = "Ready";
+      raceStatusEl.style.color = "";
+      raceStatusEl.style.fontWeight = "";
+      raceStatusEl.style.fontSize = "";
+    }
+
+    // Re-enable START button
+    const startBtn = document.getElementById("controlStartBtn");
+    if (startBtn) {
+      startBtn.disabled = false;
+      startBtn.style.opacity = "1";
+      startBtn.textContent = "▶ START";
+      startBtn.classList.add("btn-blinking");
+    }
+
+    // Scroll back to top
+    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    console.log("✅ Ready to start new race. Press START button.");
   }
 
   sendResultsToDisplay() {
