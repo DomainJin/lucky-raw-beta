@@ -4475,8 +4475,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
 
     const nameLabel = document.createElement("span");
     nameLabel.className = "duck-name";
-    nameLabel.textContent =
-      duck.name.length > 20 ? duck.name.substring(0, 18) + ".." : duck.name;
+    nameLabel.textContent = duck.name;
     // Ban đầu duck-name ở sau icon
     duckEl.appendChild(nameLabel);
     // Nếu đã về đích thì chuyển dần duck-name ra trước icon
@@ -4880,7 +4879,11 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       mode: "topN",
       winners:
         this.currentRaceWinners && this.currentRaceWinners.length > 0
-          ? this.currentRaceWinners.map((w) => ({ id: w.id, name: w.name }))
+          ? this.currentRaceWinners.map((w) => ({
+              id: w.id,
+              code: w.code,
+              name: w.name,
+            }))
           : [],
       winnerCount: this.currentRaceWinners ? this.currentRaceWinners.length : 0,
       duckCount: this.duckCount,
@@ -5865,10 +5868,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
 
           const nameLabel = document.createElement("span");
           nameLabel.className = "duck-name";
-          nameLabel.textContent =
-            duck.name.length > 20
-              ? duck.name.substring(0, 18) + ".."
-              : duck.name;
+          nameLabel.textContent = duck.name;
           duckEl.appendChild(nameLabel);
 
           const ducksParent = this.ducksLayer || this.trackContainer;
@@ -6106,11 +6106,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       this.ctx.font = `bold ${fontSize}px Arial`;
       this.ctx.textBaseline = "middle";
 
-      const maxNameLength = this.duckCount > 500 ? 15 : 20;
-      const name =
-        duck.name.length > maxNameLength
-          ? duck.name.substring(0, maxNameLength - 2) + ".."
-          : duck.name;
+      const name = duck.name;
       const textMetrics = this.ctx.measureText(name);
       const textWidth = textMetrics.width;
       const textY = Math.round(finalY + duckHeight / 2);
@@ -6267,6 +6263,10 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       // Get prize name directly from winner object (already saved with script)
       const prizeName = winner.prizeName || "";
 
+      // Get code and name separately
+      const displayCode = this.getDisplayCode(winner);
+      const displayName = this.getDisplayName(winner);
+
       // Create unique ID for winner (using name + index)
       const winnerId = `winner_${index}_${winner.name}`;
       // Default to checked (present) if not explicitly set to false
@@ -6284,7 +6284,10 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
             title="Đã gán giải thưởng"
           />
           <span style="min-width: 150px; color: #67e8f9; font-size: 13px;">${prizeName}</span>
-          <span style="flex: 1;">${medal}${colorDot}${winner.name}</span>
+          <span style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
+            <span>${medal}${colorDot}${displayCode ? `<span style="color: #ffd700; font-weight: 600; font-size: 12px;">${displayCode}</span>` : ""}</span>
+            <span>${displayName}</span>
+          </span>
         </div>
       `;
     });
@@ -6484,7 +6487,11 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     this.raceHistory.push({
       raceNumber: this.currentRaceNumber,
       mode: "topN",
-      winners: this.currentRaceWinners.map((w) => ({ id: w.id, name: w.name })),
+      winners: this.currentRaceWinners.map((w) => ({
+        id: w.id,
+        code: w.code,
+        name: w.name,
+      })),
       winnerCount: this.winnerCount,
       duckCount: this.duckCount,
       duration: this.raceDuration,
